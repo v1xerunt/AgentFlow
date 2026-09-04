@@ -4,6 +4,7 @@ const { tmpdir } = require('node:os')
 const { basename, dirname, join, resolve } = require('node:path')
 const { spawnSync } = require('node:child_process')
 const temporaryRoot = resolve(tmpdir())
+const captureScreenshots = process.env.AGENTFLOW_CAPTURE_SCREENSHOTS === '1'
 
 if (!process.versions.electron) {
   const userData = mkdtempSync(join(temporaryRoot, 'agentflow-login-ui-'))
@@ -18,6 +19,7 @@ if (!process.versions.electron) {
 
 async function run() {
   const { app, BrowserWindow, ipcMain } = require('electron')
+  app.disableHardwareAcceleration()
   const userData = process.argv[2]
   assert.ok(dirname(resolve(userData)) === temporaryRoot && basename(userData).startsWith('agentflow-login-ui-'))
   app.setPath('userData', userData)
@@ -76,7 +78,16 @@ async function run() {
     })
     window = new BrowserWindow({ width: 1100, height: 820, show: false, webPreferences: { preload: join(__dirname, '../out/preload/index.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, offscreen: true, backgroundThrottling: false } })
     window.webContents.on('paint', () => {})
+    const capture = async name => {
+      if (!captureScreenshots) return
+      await window.webContents.executeJavaScript('document.fonts.ready.then(() => undefined)')
+      await new Promise(resolve => { window.webContents.once('paint', resolve); window.webContents.invalidate() })
+      const screenshot = await window.webContents.capturePage()
+      assert.ok(!screenshot.isEmpty(), `Screenshot is empty: ${name}`)
+      writeFileSync(join(__dirname, '../out', name), screenshot.toPNG())
+    }
     await window.loadFile(join(__dirname, '../out/renderer/index.html'))
+    await window.webContents.executeJavaScript('document.fonts.ready.then(() => undefined)')
     const runUi = code => window.webContents.executeJavaScript(`(async () => {
       const waitFor = async (read) => { for (let i=0;i<200;i++) { const value=read(); if(value)return value; await new Promise(resolve=>setTimeout(resolve,20)); } throw new Error('Login UI did not settle'); };
       const findButton = (root, text) => [...(root?.querySelectorAll('button') ?? [])].find(button => button.textContent === text);
@@ -92,12 +103,7 @@ async function run() {
       return { modal:dialog.matches(':modal'), disabled:dialog.querySelector('[type=submit]').disabled, password:input.type, overflow:dialog.scrollWidth>dialog.clientWidth, active:document.activeElement===input };
     `)
     assert.deepEqual(state, { modal: true, disabled: true, password: 'password', overflow: false, active: true })
-    await new Promise(resolve => {
-      window.webContents.once('paint', resolve)
-      window.webContents.invalidate()
-    })
-    await new Promise(resolve => setTimeout(resolve, 500))
-    writeFileSync(join(__dirname, '../out/runtime-login-smoke.png'), (await window.webContents.capturePage()).toPNG())
+    await capture('runtime-login-smoke.png')
     await runUi(`
       const dialog = document.querySelector('.runtime-login-dialog');
       const input = dialog.querySelector('input');
@@ -132,9 +138,7 @@ async function run() {
     assert.equal(claudeState.placeholder, '粘贴 Claude Code 页面显示的授权码')
     assert.match(claudeState.notice, /官方 Claude Code 运行时/)
     assert.equal(claudeState.overflow, false)
-    await new Promise(resolve => { window.webContents.once('paint', resolve); window.webContents.invalidate() })
-    await new Promise(resolve => setTimeout(resolve, 500))
-    writeFileSync(join(__dirname, '../out/claude-login-smoke.png'), (await window.webContents.capturePage()).toPNG())
+    await capture('claude-login-smoke.png')
     await runUi(`
       const dialog = document.querySelector('.runtime-login-dialog');
       const input = dialog.querySelector('input');

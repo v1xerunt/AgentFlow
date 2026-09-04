@@ -68,18 +68,23 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - run: node --test scripts/release.test.cjs
       - run: npm run typecheck
+        if: runner.os == 'Linux'
       - run: npm test
+        if: runner.os == 'Linux'
+      - name: Main process and platform unit tests
+        if: runner.os != 'Linux'
+        run: npm run test:platform --workspace @agentflow/desktop
       - run: npm run build
       - name: Subscription and runtime login UI
         if: runner.os != 'Linux'
         run: |
-          node scripts/ci-run.cjs npm run test:subscription-ui --workspace @agentflow/desktop
-          node scripts/ci-run.cjs npm run test:runtime-login --workspace @agentflow/desktop
+          node scripts/ci-run.cjs node apps/desktop/scripts/smoke-subscription-ui.cjs
+          node scripts/ci-run.cjs node apps/desktop/scripts/smoke-runtime-login.cjs
       - name: Subscription and runtime login UI on Linux
         if: runner.os == 'Linux'
         run: |
-          node scripts/ci-run.cjs xvfb-run -a npm run test:subscription-ui --workspace @agentflow/desktop
-          node scripts/ci-run.cjs xvfb-run -a npm run test:runtime-login --workspace @agentflow/desktop
+          node scripts/ci-run.cjs xvfb-run -a node apps/desktop/scripts/smoke-subscription-ui.cjs
+          node scripts/ci-run.cjs xvfb-run -a node apps/desktop/scripts/smoke-runtime-login.cjs
       - name: Standalone CLI and PDF worker
         run: |
           node scripts/smoke-cli.cjs
@@ -89,9 +94,6 @@ jobs:
           node scripts/ci-run.cjs node scripts/package-skill.mjs
           node scripts/ci-run.cjs node scripts/smoke-host.cjs
       - name: Offline skill panel
-        if: runner.os != 'Linux'
-        run: node scripts/ci-run.cjs node scripts/smoke-host-panel.cjs
-      - name: Offline skill panel on Linux
         if: runner.os == 'Linux'
         run: node scripts/ci-run.cjs xvfb-run -a node scripts/smoke-host-panel.cjs
       - name: Build installers
@@ -101,7 +103,7 @@ jobs:
           APPLE_ID: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_ID || '' }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
-        run: node scripts/ci-run.cjs npm run release
+        run: node scripts/ci-run.cjs npm run release:built --workspace @agentflow/desktop
       - name: Packaged app, persistence and native terminal
         if: runner.os != 'Linux'
         run: node scripts/ci-run.cjs npm run test:release --workspace @agentflow/desktop
