@@ -109,7 +109,7 @@ jobs:
         if: runner.os == 'Linux'
         run: node scripts/ci-run.cjs xvfb-run -a npm run test:release --workspace @agentflow/desktop
       - name: Verify macOS signature and notarization ticket
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && github.event_name != 'pull_request'
         shell: bash
         run: |
           codesign --verify --deep --strict --verbose=2 apps/desktop/release/installers/mac-arm64/AgentFlow.app
