@@ -4,6 +4,8 @@ if (process.env.CSC_LINK === '') delete process.env.CSC_LINK
 const signed = process.env.AGENTFLOW_REQUIRE_SIGNING === '1'
 if (signed && process.platform !== 'linux' && !process.env.CSC_LINK) throw new Error('A signing certificate (CSC_LINK) is required for release builds')
 if (signed && process.platform === 'darwin' && !(process.env.APPLE_ID && process.env.APPLE_APP_SPECIFIC_PASSWORD && process.env.APPLE_TEAM_ID)) throw new Error('Apple notarization credentials are required for release builds')
+const artifactPlatform = { win32: 'win', darwin: 'mac', linux: 'linux' }[process.platform]
+if (!artifactPlatform || !['x64', 'arm64'].includes(process.arch)) throw new Error(`Unsupported release target: ${process.platform}-${process.arch}`)
 
 module.exports = {
   appId: 'com.agentflow.desktop',
@@ -16,7 +18,7 @@ module.exports = {
   // node-pty 1.2 ships Node-API prebuilds. stage-release copies the host build;
   // the packaged PTY smoke test is required on every release runner.
   npmRebuild: false,
-  artifactName: 'AgentFlow-${version}-${os}-${arch}.${ext}',
+  artifactName: `AgentFlow-\${version}-${artifactPlatform}-${process.arch}.\${ext}`,
   publish: null,
   forceCodeSigning: signed && process.platform !== 'linux',
   win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: 'src/assets/app-icon.ico' },
