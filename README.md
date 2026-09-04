@@ -38,17 +38,38 @@ Every Agent has its own model, instructions and conversation. You can inspect th
 
 ## Get started
 
+Open [GitHub Releases](https://github.com/v1xerunt/AgentFlow/releases) and download the installer for your computer. The desktop app includes its runtime; Node.js is only needed for source development and the standalone CLI / skill.
+
+| Your computer | Download | Install |
+| --- | --- | --- |
+| Windows x64 | `AgentFlow-<version>-windows-x64-setup.exe` | Run the setup wizard |
+| Mac with an Apple M-series chip, macOS 13+ | `AgentFlow-<version>-mac-mchip-arm64.dmg` | Drag AgentFlow into Applications |
+| Linux x64 | `AgentFlow-<version>-linux-x64.AppImage` | Make executable, then open |
+| Debian / Ubuntu x64 | `AgentFlow-<version>-linux-x64.deb` | Open with the system package installer |
+
+The Mac ZIP is used by automatic updates. The `.yml` and `.blockmap` files are update metadata; choose the installer listed above to get started.
+
+After installation:
+
+1. **Try the guided tutorial.** Follow a customer-feedback workflow through to a weekly brief. Its prepared demo responses let you explore without an API key.
+2. **Connect a model.** Open Settings and add a model API, connect an account or configure a local Agent tool.
+3. **Create a Project.** Add your input files and Agents, then connect their roles. You can also describe your task to generate a Flow.
+4. **Run and refine.** Watch the workflow progress, double-click an Agent to continue its conversation, and open the resulting files.
+
+### Updates
+
+Open **Settings → App updates** to see your version, check for updates, and control automatic checking and downloads. Both switches are enabled by default. The app checks once after startup; downloaded updates install when you exit, after your work is saved. You can also choose **Quit and install update** once a download is ready.
+
+Automatic installation is available for Windows installers, Linux AppImages, and signed macOS builds. Other builds provide a link to Releases for manual installation. Only published releases with matching update metadata are offered; drafts are not available to the updater.
+
+### Run from source
+
 Install [Node.js](https://nodejs.org/) **22.13 or newer**, then run these commands from the repository folder:
 
 ```sh
 npm ci
 npm run dev
 ```
-
-1. **Try the guided tutorial.** Follow a customer-feedback workflow through to a weekly brief. Its prepared demo responses let you explore without an API key.
-2. **Connect a model.** Open Settings and add a model API, connect an account or configure a local Agent tool.
-3. **Create a Project.** Add your input files and Agents, then connect their roles. You can also describe your task to generate a Flow.
-4. **Run and refine.** Watch the workflow progress, double-click an Agent to continue its conversation, and open the resulting files.
 
 ## AI-native skill
 

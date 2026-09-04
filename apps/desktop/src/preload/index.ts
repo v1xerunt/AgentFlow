@@ -3,8 +3,20 @@ import type { DesktopMenuAction, DesktopMenuCommand, DesktopMenuContext, Workspa
 import type { DesktopModelInvocationRequest, LlmSettingsInput, ModelStreamDelta, RuntimeLoginProgress, SubscriptionConnectorConnectOptions, SubscriptionConnectorId, SubscriptionConnectorProgress } from '../shared/llm'
 import type { DiagnosticInput } from '../shared/diagnostics'
 import type { LanguagePreference, LanguageSettings } from '@agentflow/core/localization'
+import type { UpdatePreferences, UpdateState } from '../shared/updates'
 
 contextBridge.exposeInMainWorld('agentflowDesktop', {
+  getUpdateState: () => ipcRenderer.invoke('agentflow:updates:get'),
+  setUpdatePreferences: (value: UpdatePreferences) => ipcRenderer.invoke('agentflow:updates:preferences', value),
+  checkForUpdates: () => ipcRenderer.invoke('agentflow:updates:check'),
+  downloadUpdate: () => ipcRenderer.invoke('agentflow:updates:download'),
+  installUpdate: () => ipcRenderer.invoke('agentflow:updates:install'),
+  openUpdateRelease: () => ipcRenderer.invoke('agentflow:updates:release'),
+  onUpdateState: (callback: (state: UpdateState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: UpdateState) => callback(state)
+    ipcRenderer.on('agentflow:updates:state', listener)
+    return () => ipcRenderer.removeListener('agentflow:updates:state', listener)
+  },
   getLanguageSettings: () => ipcRenderer.invoke('agentflow:language:get'),
   setLanguagePreference: (preference: LanguagePreference) => ipcRenderer.invoke('agentflow:language:set', preference),
   onLanguageChanged: (callback: (settings: LanguageSettings) => void) => {

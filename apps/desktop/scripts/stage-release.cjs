@@ -1,5 +1,6 @@
 const { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } = require('node:fs')
 const { dirname, join, resolve, relative, isAbsolute } = require('node:path')
+const { createRequire } = require('node:module')
 
 const desktop = resolve(__dirname, '..')
 const stage = join(desktop, 'release', 'app')
@@ -24,11 +25,23 @@ cpSync(prebuild, join(ptyTarget, 'prebuilds', platform), { recursive: true, filt
 if (process.platform === 'darwin') chmodSync(join(ptyTarget, 'prebuilds', platform, 'spawn-helper'), 0o755)
 const addonRoot = dirname(require.resolve('node-addon-api/package.json', { paths: [ptyRoot] }))
 cpSync(addonRoot, join(stage, 'node_modules', 'node-addon-api'), { recursive: true })
+// Keep the updater external: its platform loaders resolve files at runtime.
+function copyRuntimeDependency(name, from, target) {
+  const resolver = createRequire(join(from, 'package.json'))
+  const source = (resolver.resolve.paths(name) || []).map(root => join(root, name)).find(root => existsSync(join(root, 'package.json')))
+  if (!source) throw new Error(`Missing updater dependency: ${name}`)
+  const destination = join(target, 'node_modules', name)
+  mkdirSync(dirname(destination), { recursive: true })
+  cpSync(source, destination, { recursive: true, filter: file => file === source || !relative(source, file).split(/[\\/]/).includes('node_modules') })
+  const dependency = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+  for (const child of Object.keys(dependency.dependencies || {})) copyRuntimeDependency(child, source, destination)
+}
+copyRuntimeDependency('electron-updater', desktop, stage)
 writeFileSync(join(stage, 'package.json'), JSON.stringify({
   name: 'agentflow', version: manifest.version, private: true, type: 'module',
   description: 'AgentFlow desktop workspace for multi-agent workflows',
   homepage: manifest.homepage, repository: manifest.repository,
   author: 'AgentFlow contributors', license: manifest.license, main: manifest.main,
-  dependencies: { 'node-pty': manifest.dependencies['node-pty'] }
+  dependencies: { 'node-pty': manifest.dependencies['node-pty'], 'electron-updater': manifest.dependencies['electron-updater'] }
 }, null, 2))
 console.log(`Staged ${platform}: ${stage}`)
