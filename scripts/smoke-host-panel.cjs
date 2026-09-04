@@ -30,6 +30,7 @@ if (!process.versions.electron) {
 
 async function run() {
   const { app, BrowserWindow } = require('electron')
+  app.disableHardwareAcceleration()
   app.setPath('userData', join(process.argv[2], 'browser'))
   let window
   const timeout = setTimeout(() => { console.error('Panel check timed out'); app.exit(1) }, 30_000)

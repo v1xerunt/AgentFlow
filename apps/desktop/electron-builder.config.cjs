@@ -1,3 +1,6 @@
+// Actions provides empty strings for optional secrets; builders treat CSC_LINK
+// as a certificate path whenever the environment variable is present.
+if (process.env.CSC_LINK === '') delete process.env.CSC_LINK
 const signed = process.env.AGENTFLOW_REQUIRE_SIGNING === '1'
 if (signed && process.platform !== 'linux' && !process.env.CSC_LINK) throw new Error('A signing certificate (CSC_LINK) is required for release builds')
 if (signed && process.platform === 'darwin' && !(process.env.APPLE_ID && process.env.APPLE_APP_SPECIFIC_PASSWORD && process.env.APPLE_TEAM_ID)) throw new Error('Apple notarization credentials are required for release builds')

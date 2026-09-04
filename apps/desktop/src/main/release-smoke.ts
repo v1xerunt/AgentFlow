@@ -7,6 +7,7 @@ import { terminateManagedProcesses } from './platform-process'
 export function initializeReleaseSmoke() {
   const path = process.env.AGENTFLOW_RELEASE_SMOKE
   if (!path) return undefined
+  app.disableHardwareAcceleration()
   const root = resolve(path)
   if (dirname(root) !== resolve(tmpdir()) || !basename(root).startsWith('agentflow-release-smoke-')) throw new Error('Invalid release smoke directory')
   mkdirSync(join(root, 'profile'), { recursive: true })
