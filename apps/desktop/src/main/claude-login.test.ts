@@ -9,6 +9,7 @@ import type { RuntimeLoginProgress } from '../shared/llm'
 
 const options: ClaudeLoginOptions = { command: '/runtime/claude', cwd: '/runtime/login-workspace', env: { CLAUDE_CONFIG_DIR: '/runtime/profile' } }
 const url = 'https://claude.ai/oauth/authorize?client_id=test&state=state&code_challenge=challenge'
+const currentUrl = 'https://claude.com/cai/oauth/authorize?code=true&client_id=test&state=state&code_challenge=challenge'
 const trust = 'Do you trust the files in this folder?\nD:\\ExampleProject\n❯ 1. Yes, proceed\n2. No, exit\nEnter to confirm · Esc to exit'
 const theme = 'Choose the text style that looks best with your terminal\n> 1. Dark mode\n2. Light mode'
 const method = 'Select login method:\n> 1. Claude account with subscription · Pro, Max, Team, or Enterprise\n2. Anthropic Console account · API usage billing'
@@ -52,6 +53,19 @@ describe('Claude default login initialization', () => {
     expect(h.progress.at(-1)).toMatchObject({ phase: 'connected' })
     expect(h.dependencies.probe).toHaveBeenCalledOnce()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('submits a plain authorization code to the dedicated auth command', async () => {
+    const h = harness({ ...options, mode: 'auth-command' })
+    await h.emit(`${currentUrl}\nPaste code here if prompted >`)
+    h.service.submit(h.progress[0]!.requestId, 'code#state')
+    expect(h.terminal.write).toHaveBeenLastCalledWith('code#state')
+    await vi.advanceTimersByTimeAsync(150)
+    expect(h.terminal.write).toHaveBeenLastCalledWith('\r')
+    h.dependencies.probe.mockResolvedValue(true)
+    h.exits.forEach(listener => listener({ exitCode: 0 }))
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(h.result).resolves.toBeUndefined()
   })
 
   it('reports official runtime connectivity failures immediately', async () => {
@@ -197,6 +211,9 @@ describe('Claude default login initialization', () => {
     expect(claudeAuthUrl(url)).toBeUndefined()
     expect(claudeAuthUrl(`${url}\nPaste code here`)).toBe(url)
     expect(claudeAuthUrl(`\x1b]8;;${url}\x1b\\Sign in\x1b]8;;\x1b\\`)).toBe(url)
+    expect(claudeAuthUrl(`${currentUrl}\nPaste code here if prompted`)).toBe(currentUrl)
+    expect(claudeAuthUrl(`\x1b]8;;${currentUrl}\x1b\\${currentUrl}\x1b]8;;\x1b\\\nPaste code here`)).toBe(currentUrl)
+    expect(claudeAuthUrl(`${currentUrl.replace('/cai/oauth/authorize', '/account')}\n`)).toBeUndefined()
     expect(claudeAuthUrl(`${url.replace('claude.ai', 'evil.test')}\n`)).toBeUndefined()
   })
 

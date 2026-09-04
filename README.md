@@ -76,13 +76,13 @@ In your project, invoke `$agentflow` in Codex or `/agentflow` in Claude Code, fo
 
 You can ask your coding agent:
 
-> Read https://github.com/v1xerunt/AgentFlow/tree/dev and install the AgentFlow skill for this project. Follow the README's Instructions for LLMs.
+> Read https://github.com/v1xerunt/AgentFlow/tree/main and install the AgentFlow skill for this project. Follow the README's Instructions for LLMs.
 
 When the user requests installation:
 
 1. Identify the host (Codex or Claude Code) and the user's target project. Keep that target separate from the AgentFlow source checkout. Use a personal installation when the user requests one.
 2. Read [the CLI installation guide](docs/cli.md#build-and-install) and [the installer](scripts/install-skill.mjs). The skill source in `skills/agentflow` and CLI source in `apps/cli` are a matching pair in this repository.
-3. If a checkout is needed, clone `https://github.com/v1xerunt/AgentFlow.git` with `--branch dev` into a separate folder. In that checkout, verify Node.js 22.13+, run `npm ci`, then `npm run skill:build`.
+3. If a checkout is needed, clone `https://github.com/v1xerunt/AgentFlow.git` with `--branch main` into a separate folder. In that checkout, verify Node.js 22.13+, run `npm ci`, then `npm run skill:build`.
 4. Install the complete bundle with `node scripts/install-skill.mjs --host codex --project "<absolute target project>"`. Use `--host claude` for Claude Code, `--host both` when both are requested, or replace `--project …` with `--user` for a personal installation. Existing installations require an explicit update decision from the user.
 5. Resolve the installed skill directory from the installer's output. Run `node "<installed skill>/scripts/agentflow.mjs" host validate "<installed skill>/assets/review-flow.json"` and confirm `valid: true`.
 6. Report the installation directory and invocation: `$agentflow` in Codex or `/agentflow` in Claude Code. If the skill is not listed, reopen the host session in the target project.

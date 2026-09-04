@@ -76,13 +76,13 @@ node scripts/install-skill.mjs --host both --project "/path/to/your/project"
 
 可以直接对编程 agent 说：
 
-> 读取 https://github.com/v1xerunt/AgentFlow/tree/dev，按照 README 的 Instructions for LLMs，把 AgentFlow skill 安装到我当前的项目。
+> 读取 https://github.com/v1xerunt/AgentFlow/tree/main，按照 README 的 Instructions for LLMs，把 AgentFlow skill 安装到我当前的项目。
 
 用户请求安装时，按以下步骤操作：
 
 1. 确定当前宿主是 Codex 还是 Claude Code，以及用户的目标项目目录。区分目标项目与 AgentFlow 源码目录；用户要求个人安装时使用个人范围。
 2. 阅读 [CLI 安装说明](docs/cli.zh-CN.md#构建与安装)和[安装器](scripts/install-skill.mjs)。仓库中的 `skills/agentflow` 与 `apps/cli` 是配套的 skill 和 CLI 源码。
-3. 需要获取源码时，将 `https://github.com/v1xerunt/AgentFlow.git` 的 `dev` 分支克隆到独立目录。在源码目录检查 Node.js 22.13+，依次运行 `npm ci`、`npm run skill:build`。
+3. 需要获取源码时，将 `https://github.com/v1xerunt/AgentFlow.git` 的 `main` 分支克隆到独立目录。在源码目录检查 Node.js 22.13+，依次运行 `npm ci`、`npm run skill:build`。
 4. 用 `node scripts/install-skill.mjs --host codex --project "<目标项目的绝对路径>"` 安装完整包。Claude Code 使用 `--host claude`；用户要求两者时使用 `--host both`；个人安装用 `--user` 替换 `--project …`。遇到已有安装时，由用户明确决定如何更新。
 5. 从安装器输出取得实际 skill 目录，运行 `node "<已安装的 skill>/scripts/agentflow.mjs" host validate "<已安装的 skill>/assets/review-flow.json"`，确认返回 `valid: true`。
 6. 告知安装目录和调用方式：Codex 使用 `$agentflow`，Claude Code 使用 `/agentflow`。如果宿主尚未列出 skill，在目标项目中重新打开会话。

@@ -34,15 +34,20 @@ export async function readClaudeSubscriptionAccount(profile: string, now = Date.
 }
 
 export function claudeAuthUrl(raw: string) {
-  const hyperlinks = [...raw.matchAll(/\x1b\]8;[^;]*;([^\x07\x1b]+)(?:\x07|\x1b\\)/g)].map(match => match[1])
-  const text = `${stripVTControlCharacters(raw)}${hyperlinks.length ? `\n${hyperlinks.join('\n')}\n` : ''}`
+  const hyperlinks = [...raw.matchAll(/\x1b\]8;[^;]*;([^\x07\x1b]+)(?:\x07|\x1b\\)/g)]
+    .flatMap(match => match[1] ? [match[1]] : [])
+  const text = stripVTControlCharacters(raw)
   // Require a terminator so a URL split across terminal chunks isn't opened early.
-  const candidates = text.match(/https:\/\/[^\s<>"']+(?=\s)/g) ?? []
+  const visibleUrls = text.match(/https:\/\/(?:(?!https:\/\/)[^\s<>"'])+(?=\s|https:\/\/)/g) ?? []
+  const candidates = [...hyperlinks, ...visibleUrls]
   return candidates.find(value => {
     try {
       const url = new URL(value)
-      return ['https://claude.ai', 'https://console.anthropic.com', 'https://platform.claude.com'].includes(url.origin)
-        && !url.username && !url.password && /\/oauth\/authorize\/?$/.test(url.pathname)
+      const officialAuthorizationPath = (
+        ['https://claude.ai', 'https://console.anthropic.com', 'https://platform.claude.com'].includes(url.origin)
+          && /\/oauth\/authorize\/?$/.test(url.pathname)
+      ) || (url.origin === 'https://claude.com' && /\/cai\/oauth\/authorize\/?$/.test(url.pathname))
+      return officialAuthorizationPath && !url.username && !url.password
         && ['client_id', 'state', 'code_challenge'].every(key => Boolean(url.searchParams.get(key)))
     } catch { return false }
   })
@@ -238,8 +243,9 @@ export class ClaudeLoginService {
           publish('verifying', t("Verifying Claude authorization code…"))
           if (settled) return
           armStepTimeout()
-          // Ink treats a chunk containing both text and Enter as paste; separate them.
-          terminal.write(`\x1b[200~${value}\x1b[201~`)
+          // The dedicated auth command reads a plain line from stdin. Older
+          // interactive Ink sessions need bracketed paste to preserve the code.
+          terminal.write(directAuth ? value : `\x1b[200~${value}\x1b[201~`)
           later(() => terminal?.write('\r'))
         }
       }
