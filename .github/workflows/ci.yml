@@ -76,14 +76,14 @@ jobs:
           node scripts/smoke-pdf.cjs
       - name: Package and verify the matching skill runtime
         run: |
-          node --require ./scripts/ci-diagnostics.cjs scripts/package-skill.mjs
-          node --require ./scripts/ci-diagnostics.cjs scripts/smoke-host.cjs
+          node scripts/ci-run.cjs node scripts/package-skill.mjs
+          node scripts/ci-run.cjs node scripts/smoke-host.cjs
       - name: Offline skill panel
         if: runner.os != 'Linux'
-        run: node scripts/smoke-host-panel.cjs
+        run: node scripts/ci-run.cjs node scripts/smoke-host-panel.cjs
       - name: Offline skill panel on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a node scripts/smoke-host-panel.cjs
+        run: node scripts/ci-run.cjs xvfb-run -a node scripts/smoke-host-panel.cjs
       - name: Build installers
         env:
           CSC_LINK: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && matrix.certificate && secrets[matrix.certificate] || '' }}
@@ -91,18 +91,18 @@ jobs:
           APPLE_ID: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_ID || '' }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
-        run: npm run release
+        run: node scripts/ci-run.cjs npm run release
       - name: Packaged app, persistence and native terminal
         if: runner.os != 'Linux'
-        run: npm run test:release --workspace @agentflow/desktop
+        run: node scripts/ci-run.cjs npm run test:release --workspace @agentflow/desktop
       - name: Packaged app on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a npm run test:release --workspace @agentflow/desktop
+        run: node scripts/ci-run.cjs xvfb-run -a npm run test:release --workspace @agentflow/desktop
       - name: Collect desktop packages
-        run: node scripts/package-release.cjs desktop
+        run: node scripts/ci-run.cjs node scripts/package-release.cjs desktop
       - name: Archive CLI and skill
         if: runner.os == 'Linux'
-        run: node scripts/package-release.cjs portable
+        run: node scripts/ci-run.cjs node scripts/package-release.cjs portable
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: packages-${{ matrix.platform }}-${{ matrix.arch }}
@@ -130,7 +130,7 @@ jobs:
           path: dist/release/
           merge-multiple: true
       - name: Verify all packages and add corresponding source, checksums and notes
-        run: node scripts/package-release.cjs assemble
+        run: node scripts/ci-run.cjs node scripts/package-release.cjs assemble
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: AgentFlow-${{ needs.build.outputs.version }}-release
