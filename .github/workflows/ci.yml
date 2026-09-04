@@ -44,7 +44,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     env:
-      AGENTFLOW_REQUIRE_SIGNING: ${{ ((github.event_name == 'workflow_dispatch' && inputs.signed) || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))) && '1' || '0' }}
+      AGENTFLOW_REQUIRE_SIGNING: ${{ ((github.event_name == 'workflow_dispatch' && inputs.signed) || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.AGENTFLOW_SIGN_RELEASES == 'true')) && '1' || '0' }}
     outputs:
       version: ${{ steps.metadata.outputs.version }}
     steps:
