@@ -3,7 +3,7 @@ name: Build and release
 on:
   pull_request:
   push:
-    branches: [dev, main]
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
     inputs:

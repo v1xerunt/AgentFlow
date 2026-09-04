@@ -14,6 +14,8 @@ Keep English and Chinese text aligned. Keep generated output, local projects, cr
 
 ### CI and UI checks
 
+CI runs for pull requests, pushes to `main`, version tags (`v*`) and manual dispatches. Updates to an open pull request rerun its checks; merging into `dev` triggers no additional push build.
+
 CI runs type checking, the full unit suite and the offline panel check on Linux. Windows and macOS also run `test:platform`, covering desktop main-process and path tests. Each platform audits its dependencies, builds once, then checks login interactions, the CLI and Skill, and the packaged app. Windows additionally verifies update downloads and checksum rejection. `release:built` packages the output of a completed build; `release` builds first for standalone local use.
 
 After `npm run build`, run UI checks directly to reuse the build:
@@ -51,6 +53,8 @@ The project may pursue separate commercial licensing. Including a contribution i
 同步维护中英文文案。提交时排除生成文件、本地项目、凭据和归档证据；依赖变更同步更新锁文件，引入第三方代码或素材时保留许可声明。
 
 ### CI 与界面检查
+
+CI 在 PR、`main` 推送、版本标签（`v*`）和手动触发时运行。向已有 PR 提交更新会重新检查；合入 `dev` 后不再额外触发推送构建。
 
 Linux 执行类型检查、完整单元测试和离线面板检查；Windows、macOS 还执行 `test:platform`，覆盖桌面主进程与路径测试。三平台各执行依赖审计、构建一次，再检查登录交互、CLI、Skill 和打包后的应用；Windows 额外验证更新下载和错误校验值拒绝。`release:built` 使用已完成的构建产物打包；本地单独执行 `release` 会先构建。
 
