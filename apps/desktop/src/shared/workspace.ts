@@ -6,6 +6,7 @@ import type {
 } from '@agentflow/schema'
 import type { DesktopLlmApi } from './llm'
 import type { DesktopDiagnosticsApi } from './diagnostics'
+import type { DesktopUpdatesApi } from './updates'
 
 export type { WorkspaceBinding } from '@agentflow/schema'
 
@@ -133,7 +134,7 @@ export type DesktopMenuAction =
   | 'export-logs'
   | 'open-logs'
 
-export interface DesktopWorkspaceApi extends DesktopLlmApi, DesktopDiagnosticsApi {
+export interface DesktopWorkspaceApi extends DesktopLlmApi, DesktopDiagnosticsApi, DesktopUpdatesApi {
   getLanguageSettings(): Promise<import('@agentflow/core/localization').LanguageSettings>
   setLanguagePreference(preference: import('@agentflow/core/localization').LanguagePreference): Promise<import('@agentflow/core/localization').LanguageSettings>
   onLanguageChanged(callback: (settings: import('@agentflow/core/localization').LanguageSettings) => void): () => void

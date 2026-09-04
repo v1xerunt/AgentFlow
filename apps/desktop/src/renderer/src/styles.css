@@ -5748,3 +5748,11 @@ select:focus-visible,
 }
 
 .flow-output-node__actions { display: flex; align-items: center; gap: 4px; }
+
+.update-status { margin: 18px 0; padding: 14px 16px; border-radius: 10px; background: #eef3ec; color: #30523b; line-height: 1.6; }
+.update-option { display: flex; align-items: flex-start; gap: 11px; margin: 22px 0; font-size: 14px; }
+.update-option input { margin-top: 3px; accent-color: #357456; }
+.update-option small { display: block; margin-top: 6px; color: var(--muted, #767970); line-height: 1.6; font-size: 12px; }
+.update-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.update-actions button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border: 1px solid #d9ded3; border-radius: 8px; background: #fff; color: #344831; font: inherit; cursor: pointer; }
+.update-actions button:disabled { opacity: .5; cursor: default; }

@@ -30,7 +30,8 @@
   "devDependencies": {
     "electron": "^44.1.0",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "yaml": "2.9.0"
   },
   "description": "Visual multi-agent workflows for LLMs and coding agents",
   "license": "AGPL-3.0-only",

@@ -4,7 +4,9 @@ const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } = require(
 const { tmpdir } = require('node:os')
 const { join, resolve, dirname, basename } = require('node:path')
 const { releaseMetadata, workspaces } = require('./release-metadata.cjs')
-const { installerNames, checkAssets } = require('./package-release.cjs')
+const { installerNames, updateAssetNames, checkAssets } = require('./package-release.cjs')
+const { createHash } = require('node:crypto')
+const { stringify } = require('yaml')
 const { assertDraft } = require('./publish-release.cjs')
 function fixture(run) {
   const root = mkdtempSync(join(tmpdir(), 'agentflow-release-test-'))
@@ -32,10 +34,30 @@ test('release assets must include every platform and corresponding source withou
   for (const file of files.slice(1)) writeFileSync(join(root, file), 'fixture')
   assert.throws(() => checkAssets(root, '0.1.0'))
   writeFileSync(join(root, files[0]), 'fixture')
-  assert.equal(checkAssets(root, '0.1.0').length, 8)
+  for (const platform of ['win32', 'darwin', 'linux']) {
+    const [metadata, ...blockmaps] = updateAssetNames('0.1.0', platform)
+    for (const name of blockmaps) writeFileSync(join(root, name), 'blockmap')
+    writeFileSync(join(root, metadata), stringify({ version: '0.1.0', files: installerNames('0.1.0', platform).map(url => ({ url, sha512: createHash('sha512').update('fixture').digest('base64'), size: 7 })) }))
+  }
+  assert.equal(checkAssets(root, '0.1.0').length, 13)
+  const updateFile = join(root, 'latest.yml')
+  const original = readFileSync(updateFile, 'utf8')
+  writeFileSync(updateFile, original.replace('size: 7', 'size: 8'))
+  assert.throws(() => checkAssets(root, '0.1.0'), /checksum or size/)
+  writeFileSync(updateFile, original.replace('url: AgentFlow', 'url: https://other.example/AgentFlow'))
+  assert.throws(() => checkAssets(root, '0.1.0'), /primary|URL/)
+  writeFileSync(updateFile, original)
   writeFileSync(join(root, 'AgentFlow-0.0.9-win-x64.exe'), 'stale')
   assert.throws(() => checkAssets(root, '0.1.0'), /stale/)
 }))
+
+test('installer names describe the platform and match builder naming', () => {
+  const config = require('../apps/desktop/electron-builder.config.cjs')
+  const name = (template, ext) => template.replace('${version}', '0.1.0').replace('${ext}', ext)
+  assert.equal(name(config.win.artifactName, 'exe'), installerNames('0.1.0', 'win32')[0])
+  assert.equal(name(config.mac.artifactName, 'dmg'), installerNames('0.1.0', 'darwin')[0])
+  assert.equal(config.publish.repo, 'AgentFlow')
+})
 test('publication preserves published releases and drafts targeting another commit', () => {
   assertDraft({ draft: true, target_commitish: 'abc' }, 'abc')
   assert.throws(() => assertDraft({ draft: false, target_commitish: 'abc' }, 'abc'), /already published/)

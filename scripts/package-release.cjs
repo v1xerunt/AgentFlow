@@ -6,22 +6,43 @@ const { releaseMetadata, repository } = require('./release-metadata.cjs')
 
 function installerNames(version, platform) {
   const suffixes = {
-    win32: ['win-x64.exe'],
-    darwin: ['mac-arm64.dmg', 'mac-arm64.zip'],
+    win32: ['windows-x64-setup.exe'],
+    darwin: ['mac-mchip-arm64.dmg', 'mac-mchip-arm64.zip'],
     linux: ['linux-x64.AppImage', 'linux-x64.deb']
   }
   if (!suffixes[platform]) throw new Error(`Unsupported release platform: ${platform}`)
   return suffixes[platform].map(suffix => `AgentFlow-${version}-${suffix}`)
 }
 
+function updateAssetNames(version, platform) {
+  const metadata = platform === 'win32' ? 'latest.yml' : platform === 'darwin' ? 'latest-mac.yml' : 'latest-linux.yml'
+  const blockmaps = installerNames(version, platform).filter(name => /\.(exe|zip)$/.test(name)).map(name => `${name}.blockmap`)
+  return [metadata, ...blockmaps]
+}
+
+function verifyUpdateMetadata(directory, version, platform) {
+  const { parse } = require('yaml')
+  const metadata = parse(readFileSync(join(directory, updateAssetNames(version, platform)[0]), 'utf8'))
+  if (metadata?.version !== version || !Array.isArray(metadata.files) || !metadata.files.length) throw new Error('Invalid update metadata version or files')
+  const expected = installerNames(version, platform)
+  const primary = expected.find(name => /\.(exe|zip|AppImage)$/.test(name))
+  if (!metadata.files.some(file => file.url === primary)) throw new Error('Missing primary update installer')
+  for (const file of metadata.files) {
+    if (!expected.includes(file.url)) throw new Error('Unexpected update download URL')
+    const data = readFileSync(join(directory, file.url))
+    if (createHash('sha512').update(data).digest('base64') !== file.sha512 || data.length !== file.size) throw new Error('Update checksum or size mismatch')
+  }
+}
+
 function checkAssets(directory, version) {
   const expected = [
-    ...['win32', 'darwin', 'linux'].flatMap(platform => installerNames(version, platform)),
+    ...['win32', 'darwin', 'linux'].flatMap(platform => [...installerNames(version, platform), ...updateAssetNames(version, platform)]),
     `AgentFlow-${version}-cli.tar.gz`, `AgentFlow-${version}-skill.tar.gz`, `AgentFlow-${version}-source.tar.gz`
   ]
   for (const file of expected) if (!statSync(join(directory, file)).isFile() || !statSync(join(directory, file)).size) throw new Error(`Empty release asset: ${file}`)
-  const archives = readdirSync(directory).filter(file => /\.(exe|dmg|zip|AppImage|deb|tar\.gz)$/.test(file))
+  const archives = readdirSync(directory).filter(file => /\.(exe|dmg|zip|AppImage|deb|tar\.gz|yml|blockmap)$/.test(file))
   if (archives.sort().join('\n') !== expected.sort().join('\n')) throw new Error('Unexpected or stale release assets')
+  for (const platform of ['win32', 'darwin', 'linux']) verifyUpdateMetadata(directory, version, platform)
   return expected
 }
 
@@ -33,7 +54,7 @@ function packageRelease(mode) {
   if (mode === 'desktop') {
     const architecture = process.platform === 'darwin' ? 'arm64' : 'x64'
     if (process.arch !== architecture) throw new Error(`Expected native ${architecture} build`)
-    for (const name of installerNames(version, process.platform)) {
+    for (const name of [...installerNames(version, process.platform), ...updateAssetNames(version, process.platform)]) {
       const source = join(repository, 'apps/desktop/release/installers', name)
       if (!statSync(source).size) throw new Error(`Empty installer: ${name}`)
       cpSync(source, join(output, name))
@@ -59,9 +80,9 @@ function packageRelease(mode) {
     writeFileSync(join(output, 'BUILD_INFO.json'), JSON.stringify({ version, commit, builds }, null, 2) + '\n')
     writeFileSync(join(output, 'SHA256SUMS.txt'), [...files, 'BUILD_INFO.json'].sort().map(file => `${createHash('sha256').update(readFileSync(join(output, file))).digest('hex')}  ${file}`).join('\n') + '\n')
     const unsigned = builds.some(build => build.platform !== 'linux' && !build.signed)
-    const notes = `# AgentFlow ${version}\n\nVisual multi-agent workflows for LLMs and coding agents. / 面向 LLM 与编程 Agent 的可视化多智能体工作流。\n\n| Platform / 平台 | Download / 下载 | Install / 安装 |\n| --- | --- | --- |\n| Windows x64 | \`.exe\` | Run the installer / 双击安装 |\n| macOS 13+, Apple Silicon | \`.dmg\` | Drag AgentFlow to Applications / 拖入应用程序 |\n| Linux x64 | \`.AppImage\` | Make executable and run / 赋予执行权限后运行 |\n| Debian / Ubuntu x64 | \`.deb\` | Install with the system package installer / 使用系统安装器 |\n\nThe desktop app includes its runtime. External Agent tools may need installation and account access. / 桌面应用自带运行时，外部 Agent 工具可能需要安装和账户权限。\n\n${unsigned ? 'These builds use unsigned Windows packaging and ad-hoc macOS signing. For a trusted download, Windows may offer More info → Run anyway; macOS may offer System Settings → Privacy & Security → Open Anyway. Managed devices can restrict these options. / 本批构建使用未签名 Windows 包及 macOS 临时签名。确认下载可信后，可按系统提示选择继续运行；受管理设备可能限制此操作。' : 'Windows packages are code-signed. macOS packages use Developer ID signing and Apple notarization. / Windows 包已签名，macOS 包已使用 Developer ID 签名并完成 Apple 公证。'}\n\nThe CLI and skill archives include their matching runtime and licenses; Node.js 22.13+ is required. The skill and CLI source are also included in this repository. / CLI 和 skill 附件包含配套运行时及许可文件，需要 Node.js 22.13+；仓库同时提供二者源码。\n\nCorresponding source: \`AgentFlow-${version}-source.tar.gz\`. License: AGPL-3.0-only. Verify downloads with \`SHA256SUMS.txt\`; build details are in \`BUILD_INFO.json\`. / 对应源码、许可证、校验值及构建信息随版本提供。\n\nCommit: \`${commit}\`\n`
+    const notes = `# AgentFlow ${version}\n\nVisual multi-agent workflows for LLMs and coding agents. / 面向 LLM 与编程 Agent 的可视化多智能体工作流。\n\n| Platform / 平台 | Download / 下载 | Install / 安装 |\n| --- | --- | --- |\n| Windows x64 | \`AgentFlow-${version}-windows-x64-setup.exe\` | Run the installer / 双击安装 |\n| macOS 13+, M-series / M 系列芯片 | \`AgentFlow-${version}-mac-mchip-arm64.dmg\` | Drag AgentFlow to Applications / 拖入应用程序 |\n| Linux x64 | \`AgentFlow-${version}-linux-x64.AppImage\` | Make executable and run / 赋予执行权限后运行 |\n| Debian / Ubuntu x64 | \`AgentFlow-${version}-linux-x64.deb\` | Install with the system package installer / 使用系统安装器 |\n\nThe mac-mchip ZIP and the .yml / .blockmap files support automatic updates; use the installer in the table above for your first installation. / Mac ZIP 及 .yml、.blockmap 文件供自动更新使用，首次安装请选择上表文件。\n\nThe desktop app includes its runtime. External Agent tools may need installation and account access. / 桌面应用自带运行时，外部 Agent 工具可能需要安装和账户权限。\n\n${unsigned ? 'These builds use unsigned Windows packaging and ad-hoc macOS signing. For a trusted download, Windows may offer More info → Run anyway; macOS may offer System Settings → Privacy & Security → Open Anyway. Managed devices can restrict these options. / 本批构建使用未签名 Windows 包及 macOS 临时签名。确认下载可信后，可按系统提示选择继续运行；受管理设备可能限制此操作。' : 'Windows packages are code-signed. macOS packages use Developer ID signing and Apple notarization. / Windows 包已签名，macOS 包已使用 Developer ID 签名并完成 Apple 公证。'}\n\nThe CLI and skill archives include their matching runtime and licenses; Node.js 22.13+ is required. The skill and CLI source are also included in this repository. / CLI 和 skill 附件包含配套运行时及许可文件，需要 Node.js 22.13+；仓库同时提供二者源码。\n\nCorresponding source: \`AgentFlow-${version}-source.tar.gz\`. License: AGPL-3.0-only. Verify downloads with \`SHA256SUMS.txt\`; build details are in \`BUILD_INFO.json\`. / 对应源码、许可证、校验值及构建信息随版本提供。\n\nCommit: \`${commit}\`\n`
     writeFileSync(join(output, 'RELEASE_NOTES.md'), notes)
   } else throw new Error('Use desktop, portable or assemble')
 }
 if (require.main === module) packageRelease(process.argv[2])
-module.exports = { installerNames, checkAssets, packageRelease }
+module.exports = { installerNames, updateAssetNames, verifyUpdateMetadata, checkAssets, packageRelease }

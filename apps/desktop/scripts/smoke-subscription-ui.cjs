@@ -20,6 +20,7 @@ if (!process.versions.electron) {
 
 async function run() {
   const { app, BrowserWindow, ipcMain } = require('electron')
+  app.disableHardwareAcceleration()
   const userData = process.argv[2]
   assert.ok(userData && dirname(resolve(userData)) === temporaryRoot && basename(userData).startsWith('agentflow-subscription-ui-'))
   app.setPath('userData', userData)
@@ -98,8 +99,15 @@ async function run() {
       snapshot.catalog = []
       return snapshot
     })
-    window = new BrowserWindow({ width: 1200, height: 880, show: false, webPreferences: { preload: join(__dirname, '../out/preload/index.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, offscreen: Boolean(process.env.AGENTFLOW_CAPTURE_PROVIDER_MODELS || process.env.AGENTFLOW_CAPTURE_CHAT_ACTIONS) } })
-    if (process.env.AGENTFLOW_CAPTURE_CHAT_ACTIONS) window.webContents.on('paint', () => {})
+    window = new BrowserWindow({ width: 1200, height: 880, show: false, webPreferences: { preload: join(__dirname, '../out/preload/index.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, offscreen: true } })
+    window.webContents.on('paint', () => {})
+    const capture = async name => {
+      await window.webContents.executeJavaScript('document.fonts.ready.then(() => undefined)')
+      await new Promise(resolve => { window.webContents.once('paint', resolve); window.webContents.invalidate() })
+      const screenshot = await window.webContents.capturePage()
+      assert.ok(!screenshot.isEmpty(), `Screenshot is empty: ${name}`)
+      writeFileSync(join(__dirname, '../out', name), screenshot.toPNG())
+    }
     await window.loadFile(join(__dirname, '../out/renderer/index.html'))
     let browserStep = 0
     const evaluate = window.webContents.executeJavaScript.bind(window.webContents)
@@ -120,7 +128,7 @@ async function run() {
     assert.equal(riskState.overflow, false)
     assert.equal(riskState.focus, '取消')
     assert.match(riskState.copy, /限流、账号限制或封禁/)
-    if (!process.env.AGENTFLOW_CAPTURE_PROVIDER_MODELS) writeFileSync(join(__dirname, '../out/subscription-risk-smoke.png'), (await window.webContents.capturePage()).toPNG())
+    if (!process.env.AGENTFLOW_CAPTURE_PROVIDER_MODELS) await capture('subscription-risk-smoke.png')
     await window.webContents.executeJavaScript(`(async () => {
       const waitFor = async (read) => { for (let i = 0; i < 200; i++) { const value = read(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 25)); } throw new Error('UI did not settle'); };
       document.querySelector('.subscription-risk-dialog .quiet-button').click();
@@ -255,7 +263,7 @@ async function run() {
     assert.equal(providerListState.statePreserved, true)
     assert.equal(providerListState.overflow, false)
     assert.deepEqual(anthropic.disabledModels, ['claude-opus-5'])
-    if (process.env.AGENTFLOW_CAPTURE_PROVIDER_MODELS) writeFileSync(join(__dirname, '../out/provider-models-smoke.png'), (await window.webContents.capturePage()).toPNG())
+    if (process.env.AGENTFLOW_CAPTURE_PROVIDER_MODELS) await capture('provider-models-smoke.png')
     const modelListState = await window.webContents.executeJavaScript(`(async () => {
       const waitFor = async (read, label) => { for (let i = 0; i < 200; i++) { const value = read(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 25)); } throw new Error('UI did not settle: ' + label); };
       [...document.querySelectorAll('.settings-navigation button')].find(button => button.querySelector('strong')?.textContent === '本机 Agent 工具').click();
@@ -355,11 +363,7 @@ async function run() {
     assert.equal(chatState.distinctIcon, true)
     assert.equal(chatState.outputDidNotCopy, true)
     assert.equal(chatState.overflow, false)
-    if (process.env.AGENTFLOW_CAPTURE_CHAT_ACTIONS) {
-      await new Promise(resolve=>{window.webContents.once('paint',resolve);window.webContents.invalidate()})
-      await new Promise(resolve=>setTimeout(resolve,200))
-      writeFileSync(join(__dirname,'../out/chat-actions-smoke.png'),(await window.webContents.capturePage()).toPNG())
-    }
+    if (process.env.AGENTFLOW_CAPTURE_CHAT_ACTIONS) await capture('chat-actions-smoke.png')
     console.log('Connection, Agent and chat UI smoke passed: consent, provider settings, model toggles, empty-input guard, output reveal, per-message copy/retry and transcript output icon.')
   } catch (error) {
     console.error(error)

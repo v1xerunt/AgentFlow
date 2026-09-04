@@ -2,6 +2,7 @@ import { configureLanguage, getLanguageSettings, isLanguagePreference, t, type L
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { release } from 'node:os'
+import { createRequire } from 'node:module'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from 'electron'
 import appIconPng from '../assets/app-icon.png?asset'
 import appIconIco from '../assets/app-icon.ico?asset'
@@ -27,6 +28,7 @@ import type { DiagnosticInput } from '../shared/diagnostics'
 import { atomicWriteFile } from './atomic-file'
 import { initializeRuntimeEnvironment, terminateManagedProcesses } from './platform-process'
 import { initializeReleaseSmoke, runReleaseSmoke } from './release-smoke'
+import { UpdateService } from './update-service'
 
 const releaseSmokeRoot = initializeReleaseSmoke()
 
@@ -204,6 +206,40 @@ interface WindowCloseState {
 const closeStates = new Map<number, WindowCloseState>()
 const modelInvocations = new Map<string, AbortController>()
 let workspaceWrites = Promise.resolve()
+let updateService: UpdateService | undefined
+let updateQuitRequested = false
+
+async function initializeUpdates() {
+  const packaged = app.isPackaged && !releaseSmokeRoot
+  const manifest = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
+  const limitation = !packaged ? 'development' : process.platform === 'darwin' && !manifest.agentflowSigned ? 'unsigned-mac' : process.platform === 'linux' && !process.env.APPIMAGE ? 'linux-package' : null
+  const client = packaged ? (createRequire(import.meta.url)('electron-updater') as typeof import('electron-updater')).autoUpdater : undefined
+  if (client) {
+    client.logger = {
+      info: message => diagnosticLog.record({ level: 'info', event: 'update.info', details: { message } }),
+      warn: message => diagnosticLog.record({ level: 'warn', event: 'update.warning', details: { message } }),
+      error: message => diagnosticLog.record({ level: 'error', event: 'update.error', details: { message } })
+    }
+    if ('disableWebInstaller' in client) client.disableWebInstaller = true
+  }
+  updateService = new UpdateService({
+    client, version: app.getVersion(), file: join(getStoreDirectory(), 'updates.json'), limitation,
+    onChange: state => { for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('agentflow:updates:state', state) },
+    onError: error => diagnosticLog.record({ level: 'warn', event: 'update.failed', details: { error } }),
+    quit: () => { updateQuitRequested = true; app.quit() }
+  })
+  await updateService.initialize()
+  const authorize = (event: Electron.IpcMainInvokeEvent) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window || !closeStates.has(window.id)) throw new Error('Updates require an app window')
+  }
+  handle('agentflow:updates:get', event => { authorize(event); return updateService!.snapshot() })
+  handle('agentflow:updates:preferences', (event, value: unknown) => { authorize(event); return updateService!.setPreferences(value) })
+  handle('agentflow:updates:check', event => { authorize(event); return updateService!.check() })
+  handle('agentflow:updates:download', event => { authorize(event); return updateService!.download() })
+  handle('agentflow:updates:install', event => { authorize(event); updateService!.install() })
+  handle('agentflow:updates:release', event => { authorize(event); return shell.openExternal('https://github.com/v1xerunt/AgentFlow/releases') })
+}
 
 function sendMenuCommand(command: DesktopMenuCommand, targetWindow?: BrowserWindow | null) {
   const window = targetWindow ?? BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
@@ -447,7 +483,7 @@ function registerWorkspaceHandlers() {
     if (!window) return
     const state = closeStates.get(window.id) ?? {}
     state.prompting = false
-    if (!success) { closeStates.set(window.id, state); return }
+    if (!success) { updateQuitRequested = false; closeStates.set(window.id, state); return }
     state.allowClose = true
     closeStates.set(window.id, state)
     window.close()
@@ -683,6 +719,7 @@ app.whenReady().then(async () => {
   registerLlmHandlers()
   registerDesktopMenuHandlers()
   registerDiagnosticHandlers()
+  await initializeUpdates()
   installApplicationMenu()
   createWindow()
   if (releaseSmokeRoot) void runReleaseSmoke(releaseSmokeRoot)
@@ -700,6 +737,7 @@ let logsFlushedForQuit = false
 app.on('will-quit', event => {
   if (logsFlushedForQuit) return
   event.preventDefault()
+  updateService?.dispose()
   for (const controller of modelInvocations.values()) controller.abort()
   terminateManagedProcesses()
   diagnosticLog.record({ level: 'info', event: 'app.quit' })
@@ -710,5 +748,5 @@ app.on('will-quit', event => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform !== 'darwin' || updateQuitRequested) app.quit()
 })

@@ -38,17 +38,38 @@
 
 ## 快速开始
 
+打开 [GitHub Releases](https://github.com/v1xerunt/AgentFlow/releases)，按电脑类型下载安装包。桌面版自带运行时；源码开发及独立 CLI / Skill 才需要安装 Node.js。
+
+| 你的电脑 | 应下载的文件 | 安装方式 |
+| --- | --- | --- |
+| Windows x64 | `AgentFlow-<版本>-windows-x64-setup.exe` | 双击运行安装向导 |
+| M 系列芯片 Mac，macOS 13 或更新系统 | `AgentFlow-<版本>-mac-mchip-arm64.dmg` | 打开后将 AgentFlow 拖入“应用程序” |
+| Linux x64 | `AgentFlow-<版本>-linux-x64.AppImage` | 赋予执行权限后运行 |
+| Debian / Ubuntu x64 | `AgentFlow-<版本>-linux-x64.deb` | 使用系统软件包安装器打开 |
+
+Mac 的 ZIP 用于自动更新；`.yml`、`.blockmap` 是更新清单和辅助文件。首次使用请选择上表中的安装包。
+
+安装完成后：
+
+1. **体验引导教程。** 跟随客户回访工作流生成周会简报。教程使用预设演示回复，无需 API Key。
+2. **连接模型。** 打开设置，添加模型 API、连接账户，或配置本地 Agent 工具。
+3. **创建 Project。** 添加输入文件和 Agent，连接它们的角色；也可以描述任务来生成 Flow。
+4. **运行并完善。** 查看执行过程，双击 Agent 继续对话，打开最终生成的文件。
+
+### 检查与自动更新
+
+打开 **设置 → 应用更新**，查看当前版本、手动检查更新，或调整自动检查与下载开关。两个开关默认开启：启动后检查一次更新；下载完成后，在保存工作并退出应用时安装。也可以点击 **退出并安装更新**。
+
+Windows 安装版、Linux AppImage 和经过签名的 macOS 构建支持自动安装。其他构建可通过页面中的 Release 入口下载并手动安装。更新器只获取已经正式发布且包含配套更新清单的版本，草稿版本不会推送。
+
+### 从源码启动
+
 安装 [Node.js](https://nodejs.org/) **22.13 或更高版本**，然后在仓库目录运行：
 
 ```sh
 npm ci
 npm run dev
 ```
-
-1. **体验引导教程。** 跟随客户回访工作流生成周会简报。教程使用预设演示回复，无需 API Key。
-2. **连接模型。** 打开设置，添加模型 API、连接账户，或配置本地 Agent 工具。
-3. **创建 Project。** 添加输入文件和 Agent，连接它们的角色；也可以描述任务来生成 Flow。
-4. **运行并完善。** 查看执行过程，双击 Agent 继续对话，打开最终生成的文件。
 
 ## AI-native skill
 

@@ -19,10 +19,11 @@ module.exports = {
   // the packaged PTY smoke test is required on every release runner.
   npmRebuild: false,
   artifactName: `AgentFlow-\${version}-${artifactPlatform}-${process.arch}.\${ext}`,
-  publish: null,
+  publish: { provider: 'github', owner: 'v1xerunt', repo: 'AgentFlow', releaseType: 'release' },
+  extraMetadata: { agentflowSigned: signed },
   forceCodeSigning: signed && process.platform !== 'linux',
-  win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: 'src/assets/app-icon.ico' },
+  win: { target: [{ target: 'nsis', arch: ['x64'] }], artifactName: 'AgentFlow-${version}-windows-x64-setup.${ext}', icon: 'src/assets/app-icon.ico' },
   nsis: { oneClick: false, allowToChangeInstallationDirectory: true, perMachine: false, deleteAppDataOnUninstall: false },
-  mac: { target: [{ target: 'dmg', arch: ['arm64'] }, { target: 'zip', arch: ['arm64'] }], icon: 'src/assets/app-icon.png', category: 'public.app-category.productivity', minimumSystemVersion: '13.0', identity: process.env.CSC_LINK || process.env.CSC_NAME ? undefined : '-', hardenedRuntime: true, entitlements: 'build/entitlements.mac.plist', entitlementsInherit: 'build/entitlements.mac.plist', notarize: signed },
+  mac: { target: [{ target: 'dmg', arch: ['arm64'] }, { target: 'zip', arch: ['arm64'] }], artifactName: 'AgentFlow-${version}-mac-mchip-arm64.${ext}', icon: 'src/assets/app-icon.png', category: 'public.app-category.productivity', minimumSystemVersion: '13.0', identity: process.env.CSC_LINK || process.env.CSC_NAME ? undefined : '-', hardenedRuntime: true, entitlements: 'build/entitlements.mac.plist', entitlementsInherit: 'build/entitlements.mac.plist', notarize: signed },
   linux: { target: [{ target: 'AppImage', arch: ['x64'] }, { target: 'deb', arch: ['x64'] }], icon: 'src/assets/app-icon.png', category: 'Development', maintainer: 'AgentFlow' }
 }

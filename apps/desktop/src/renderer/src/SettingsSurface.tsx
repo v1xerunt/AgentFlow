@@ -48,6 +48,7 @@ import { agentToolModelChoices, enabledAgentToolModels } from '../../shared/agen
 import { enabledProviderModels, providerModelChoices } from '../../shared/provider-models'
 import { RuntimeLoginDialog } from './RuntimeLoginDialog'
 import { saveLanguagePreference, useLanguage } from './language'
+import { UpdateSettings } from './UpdateSettings'
 import { detectLanguage, type LanguagePreference } from '@agentflow/core/localization'
 
 interface Props {
@@ -61,7 +62,7 @@ interface Props {
 interface ProviderDraft extends ProviderConfiguration { apiKey: string; clearApiKey: boolean }
 interface ProviderTestFeedback { tone: 'testing' | 'success' | 'error'; text: string }
 
-type SettingsPageId = 'general' | 'ai' | 'model-defaults' | 'subscriptions' | 'providers' | 'tools' | 'chat'
+type SettingsPageId = 'general' | 'updates' | 'ai' | 'model-defaults' | 'subscriptions' | 'providers' | 'tools' | 'chat'
 
 interface SettingsNavigationItem {
   id: SettingsPageId
@@ -76,14 +77,17 @@ interface SettingsNavigationSection { label: string; items: SettingsNavigationIt
 const navigationSections: SettingsNavigationSection[] = [
   {
     get label() { return t('General') },
-    items: [{ id: 'general', get label() { return t('Language') }, get description() { return t('Display language') }, icon: SlidersHorizontal, keywords: 'language locale 中文 English 系统 语言' }]
+    items: [
+      { id: 'general', get label() { return t('Language') }, get description() { return t('Display language') }, icon: SlidersHorizontal, keywords: 'language locale 中文 English 系统 语言' },
+      { id: 'updates', get label() { return t('App updates') }, get description() { return t('Version checks and automatic updates') }, icon: Download, keywords: 'update version download release 更新 升级 版本 下载' }
+    ]
   },
   {
     get label() { return t("Connections") },
     items: [
-      { id: 'subscriptions', get label() { return t("Subscription accounts") }, get description() { return t("Sign in to AI accounts and subscriptions") }, icon: Link2, keywords: '订阅 登录 chatgpt codex claude kimi gemini antigravity deepseek web bridge oauth 账户' },
       { id: 'providers', get label() { return t("API Provider") }, get description() { return t("Credentials, endpoints, and available models") }, icon: KeyRound, keywords: 'api key base url openai anthropic gemini deepseek zai kimi openrouter 自定义 兼容' },
-      { id: 'tools', get label() { return t("Local Agent tools") }, get description() { return t("Commands, models, and runtime capabilities") }, icon: Bot, keywords: 'codex claude code deepseek harness kimi command cli 本地' }
+      { id: 'tools', get label() { return t("Local Agent tools") }, get description() { return t("Commands, models, and runtime capabilities") }, icon: Bot, keywords: 'codex claude code deepseek harness kimi command cli 本地' },
+      { id: 'subscriptions', get label() { return t("Subscription accounts") }, get description() { return t("Sign in to AI accounts and subscriptions") }, icon: Link2, keywords: '订阅 登录 chatgpt codex claude kimi gemini antigravity deepseek web bridge oauth 账户' }
     ]
   },
   {
@@ -572,6 +576,7 @@ export function SettingsSurface({ settings, onChange, onClose, initialPage = 'ge
 
         {normalizedQuery && !hasSearchResults ? <div className="settings-list settings-search-empty"><SettingsEmpty query={query} /></div> : null}
 
+        {hasSearchResults && activePageId === 'updates' ? <UpdateSettings /> : null}
         {hasSearchResults && activePageId === 'general' ? <section className="settings-group settings-group--first">
           <div className="settings-group-heading settings-group-heading--stacked"><div className="settings-group-heading-copy"><h2>{t('Display language')}</h2></div><p>{t('Choose your interface language. Changes apply immediately.')}</p></div>
           <label className="field language-setting"><span>{t('Language')}</span><select aria-label={t('Display language')} value={language.preference} disabled={savingLanguage} onChange={async event => {
