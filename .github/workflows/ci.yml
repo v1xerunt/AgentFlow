@@ -76,8 +76,8 @@ jobs:
           node scripts/smoke-pdf.cjs
       - name: Package and verify the matching skill runtime
         run: |
-          node scripts/package-skill.mjs
-          node scripts/smoke-host.cjs
+          node --require ./scripts/ci-diagnostics.cjs scripts/package-skill.mjs
+          node --require ./scripts/ci-diagnostics.cjs scripts/smoke-host.cjs
       - name: Offline skill panel
         if: runner.os != 'Linux'
         run: node scripts/smoke-host-panel.cjs
