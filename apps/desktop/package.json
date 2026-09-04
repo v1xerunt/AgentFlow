@@ -12,7 +12,8 @@
     "stage:release": "node scripts/stage-release.cjs",
     "test:release": "node scripts/smoke-release.cjs",
     "pack": "npm run build && npm run stage:release && electron-builder --config electron-builder.config.cjs --dir --publish never",
-    "release": "npm run build && npm run stage:release && electron-builder --config electron-builder.config.cjs --publish never",
+    "release": "npm run build && npm run release:built",
+    "release:built": "npm run stage:release && electron-builder --config electron-builder.config.cjs --publish never",
     "build:web": "vite build --config vite.web.config.ts",
     "test:preload": "electron-vite build && node scripts/smoke-preload.cjs",
     "test:branding": "electron-vite build && node scripts/smoke-branding.cjs",
@@ -22,6 +23,7 @@
     "test:subscription-ui": "electron-vite build && node scripts/smoke-subscription-ui.cjs",
     "test:tutorial": "electron-vite build && node scripts/smoke-tutorial.cjs",
     "test": "vitest run src",
+    "test:platform": "vitest run src/main src/shared/directory-path.test.ts",
     "test:runtime-login": "electron-vite build && node scripts/smoke-runtime-login.cjs",
     "test:flow-viewport": "electron-vite build && node scripts/smoke-flow-viewport.cjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"

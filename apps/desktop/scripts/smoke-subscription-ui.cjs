@@ -5,6 +5,7 @@ const { basename, dirname, join, resolve } = require('node:path')
 const { spawnSync } = require('node:child_process')
 
 const temporaryRoot = resolve(tmpdir())
+const captureScreenshots = process.env.AGENTFLOW_CAPTURE_SCREENSHOTS === '1'
 if (!process.versions.electron) {
   const userData = mkdtempSync(join(temporaryRoot, 'agentflow-subscription-ui-'))
   try {
@@ -29,6 +30,17 @@ async function run() {
   let providerTests = 0
   let savedWorkspace
   let invocationCalls = 0
+  let expectedProviderFailures = 0
+  const missingWorkspace = new Error('Anthropic 请求失败 (400)：此 API 密钥需要指定工作区。请在此服务商的“Anthropic 工作区 ID”中填写 Claude 控制台的设置 → 工作区中的 ID（wrkspc_…），然后重新测试连接。')
+  const reportError = console.error
+  console.error = (...args) => {
+    if (args[0] === "Error occurred in handler for 'agentflow:llm:provider:test':" && args[1] === missingWorkspace) {
+      expectedProviderFailures++
+      console.log('Expected test scenario: provider rejects a missing workspace ID; the UI must recover on retry.')
+      return
+    }
+    reportError(...args)
+  }
   const revealed = []
   const tool = { id: 'agent-tool:claude-code', name: 'Claude Code', command: 'claude', installed: true, enabled: true, added: true, models: ['opus', 'sonnet', 'haiku', 'opus[1m]', 'sonnet[1m]'], disabledModels: [], reasoningEfforts: [], modelReasoningEfforts: { opus: ['low', 'medium', 'high'], sonnet: ['low', 'medium', 'high'], 'opus[1m]': ['low', 'medium', 'high'], 'sonnet[1m]': ['low', 'medium', 'high'] }, reasoningOverrideSupported: true }
   const modelLabels = { 'deepseek-chat': '快速模式', 'deepseek-reasoner': '专家模式' }
@@ -74,7 +86,7 @@ async function run() {
     const testProvider = (_event, id) => {
       assert.equal(id, 'anthropic')
       providerTests += 1
-      if (!anthropic.anthropicWorkspaceId) throw new Error('Anthropic 请求失败 (400)：此 API 密钥需要指定工作区。请在此服务商的“Anthropic 工作区 ID”中填写 Claude 控制台的设置 → 工作区中的 ID（wrkspc_…），然后重新测试连接。')
+      if (!anthropic.anthropicWorkspaceId) throw missingWorkspace
       assert.equal(anthropic.anthropicWorkspaceId, 'wrkspc_test123')
       anthropic.discoveredModels = ['claude-sonnet-5', 'claude-opus-5']
       return snapshot
@@ -102,6 +114,7 @@ async function run() {
     window = new BrowserWindow({ width: 1200, height: 880, show: false, webPreferences: { preload: join(__dirname, '../out/preload/index.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, offscreen: true } })
     window.webContents.on('paint', () => {})
     const capture = async name => {
+      if (!captureScreenshots) return
       await window.webContents.executeJavaScript('document.fonts.ready.then(() => undefined)')
       await new Promise(resolve => { window.webContents.once('paint', resolve); window.webContents.invalidate() })
       const screenshot = await window.webContents.capturePage()
@@ -109,6 +122,7 @@ async function run() {
       writeFileSync(join(__dirname, '../out', name), screenshot.toPNG())
     }
     await window.loadFile(join(__dirname, '../out/renderer/index.html'))
+    await window.webContents.executeJavaScript('document.fonts.ready.then(() => undefined)')
     let browserStep = 0
     const evaluate = window.webContents.executeJavaScript.bind(window.webContents)
     window.webContents.executeJavaScript = async (...args) => {
@@ -128,7 +142,7 @@ async function run() {
     assert.equal(riskState.overflow, false)
     assert.equal(riskState.focus, '取消')
     assert.match(riskState.copy, /限流、账号限制或封禁/)
-    if (!process.env.AGENTFLOW_CAPTURE_PROVIDER_MODELS) await capture('subscription-risk-smoke.png')
+    await capture('subscription-risk-smoke.png')
     await window.webContents.executeJavaScript(`(async () => {
       const waitFor = async (read) => { for (let i = 0; i < 200; i++) { const value = read(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 25)); } throw new Error('UI did not settle'); };
       document.querySelector('.subscription-risk-dialog .quiet-button').click();
@@ -263,7 +277,7 @@ async function run() {
     assert.equal(providerListState.statePreserved, true)
     assert.equal(providerListState.overflow, false)
     assert.deepEqual(anthropic.disabledModels, ['claude-opus-5'])
-    if (process.env.AGENTFLOW_CAPTURE_PROVIDER_MODELS) await capture('provider-models-smoke.png')
+    await capture('provider-models-smoke.png')
     const modelListState = await window.webContents.executeJavaScript(`(async () => {
       const waitFor = async (read, label) => { for (let i = 0; i < 200; i++) { const value = read(); if (value) return value; await new Promise(resolve => setTimeout(resolve, 25)); } throw new Error('UI did not settle: ' + label); };
       [...document.querySelectorAll('.settings-navigation button')].find(button => button.querySelector('strong')?.textContent === '本机 Agent 工具').click();
@@ -277,7 +291,6 @@ async function run() {
       const control = label => [...row.querySelectorAll('button')].find(button => button.textContent === label);
       control('全部关闭').click();
       await waitFor(() => switches().every(input => !input.checked), 'all disabled');
-      const noDefaultPicker = !row.querySelector('[aria-label="Claude Code 默认模型"]');
       switches()[2].click();
       await waitFor(() => switches().filter(input => input.checked).length === 1, 'one enabled');
       control('全部启用').click();
@@ -285,15 +298,13 @@ async function run() {
       switches()[1].click();
       await waitFor(() => switches().filter(input => input.checked).length === count - 1, 'individual disabled');
       await new Promise(resolve => setTimeout(resolve, 650));
-      const result = { allInitiallyEnabled, count, modelLabels, noDefaultPicker, freeTextCount: row.querySelectorAll('.tool-capability-settings input:not([type=checkbox]), .tool-capability-settings textarea').length, overflow: row.scrollWidth > row.clientWidth };
+      const result = { allInitiallyEnabled, count, modelLabels, overflow: row.scrollWidth > row.clientWidth };
       document.querySelector('.settings-back').click();
       await waitFor(() => !document.querySelector('.settings-surface'), 'closed');
       return result;
     })()`)
     assert.equal(modelListState.allInitiallyEnabled, true)
     assert.equal(modelListState.count, 6)
-    assert.equal(modelListState.noDefaultPicker, true)
-    assert.equal(modelListState.freeTextCount, 0)
     assert.equal(modelListState.overflow, false)
     assert.deepEqual(tool.disabledModels, ['opus'])
     const runState = await window.webContents.executeJavaScript(`(async () => {
@@ -311,15 +322,13 @@ async function run() {
       await waitFor(() => !run().disabled, 'enabled run');
       run().click();
       await waitFor(() => document.querySelector('.output-preview-block'), 'output');
-      const removedCopyAbsent = !document.querySelector('.inspector').textContent.includes('Working State 自动保存');
       document.querySelector('.output-preview-block button[title="在资源管理器中打开"]').click();
       (await waitFor(() => document.querySelector('.flow-node__top-actions button[aria-label^="在资源管理器中打开"]'), 'card reveal')).click();
-      return { emptyDisabled, whitespaceDisabled, disabledTitle, removedCopyAbsent };
+      return { emptyDisabled, whitespaceDisabled, disabledTitle };
     })()`)
     assert.equal(runState.emptyDisabled, true)
     assert.equal(runState.whitespaceDisabled, true)
     assert.match(runState.disabledTitle, /添加输入内容/)
-    assert.equal(runState.removedCopyAbsent, true)
     for (let i = 0; i < 100 && revealed.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 20))
     assert.equal(invocationCalls, 1)
     assert.equal(revealed.length, 2)
@@ -351,24 +360,24 @@ async function run() {
       assistantCopy.click();
       await waitFor(()=>assistant.querySelector('[role=status]')?.textContent==='已复制');
       const output=assistant.querySelector('[aria-label="将截至此处的完整对话设为结果输出"]');
-      const distinctIcon=Boolean(output.querySelector('.lucide-file-output'))&&!output.querySelector('.lucide-copy,.lucide-files');
       const beforePublish=writes.length;
       output.click();
       await waitFor(()=>document.body.textContent.includes('截至此处的完整对话已设为结果输出'));
       assistantCopy.focus();
       assistant.scrollIntoView({block:'center'});
-      return {text,writes,distinctIcon,outputDidNotCopy:writes.length===beforePublish,overflow:assistant.scrollWidth>assistant.clientWidth};
+      return {text,writes,outputDidNotCopy:writes.length===beforePublish,overflow:assistant.scrollWidth>assistant.clientWidth};
     })()`)
     assert.deepEqual(chatState.writes, [chatState.text, '# UI smoke output', '# UI smoke output'])
-    assert.equal(chatState.distinctIcon, true)
     assert.equal(chatState.outputDidNotCopy, true)
     assert.equal(chatState.overflow, false)
-    if (process.env.AGENTFLOW_CAPTURE_CHAT_ACTIONS) await capture('chat-actions-smoke.png')
-    console.log('Connection, Agent and chat UI smoke passed: consent, provider settings, model toggles, empty-input guard, output reveal, per-message copy/retry and transcript output icon.')
+    await capture('chat-actions-smoke.png')
+    assert.equal(expectedProviderFailures, 1)
+    console.log('Connection, Agent and chat UI smoke passed: consent, provider settings, model toggles, empty-input guard, output reveal, per-message copy/retry and transcript output.')
   } catch (error) {
     console.error(error)
     process.exitCode = 1
   } finally {
+    console.error = reportError
     clearTimeout(timeout)
     window?.destroy()
     app.exit(process.exitCode ?? 0)

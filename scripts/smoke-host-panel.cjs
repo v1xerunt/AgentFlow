@@ -6,12 +6,13 @@ const { spawnSync } = require('node:child_process')
 const root = resolve(__dirname, '..')
 const output = join(root, 'artifacts/host-panel')
 const screenshots = join(output, 'screenshots')
+const captureScreenshots = process.env.AGENTFLOW_CAPTURE_SCREENSHOTS === '1'
 
 if (!process.versions.electron) {
   const userData = mkdtempSync(join(tmpdir(), 'agentflow-host-panel-'))
   try {
     mkdirSync(output, { recursive: true })
-    mkdirSync(screenshots, { recursive: true })
+    if (captureScreenshots) mkdirSync(screenshots, { recursive: true })
     const source = JSON.parse(readFileSync(join(root, 'skills/agentflow/assets/review-flow.json'), 'utf8'))
     source.nodes.writer.prompts.system.locked = true
     source.nodes.writer.prompts.system.content += '\n</script><script>globalThis.injected=true</script>'
@@ -77,7 +78,7 @@ async function run() {
       await evaluate('document.fonts.ready')
       await new Promise(done => setTimeout(done, 160))
       assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Document must fit the viewport; only the canvas scrolls horizontally')
-      writeFileSync(join(screenshots, `host-${name}.png`), (await window.webContents.capturePage()).toPNG())
+      if (captureScreenshots) writeFileSync(join(screenshots, `host-${name}.png`), (await window.webContents.capturePage()).toPNG())
     }
     assert.deepEqual(errors, [])
     console.log('Offline panel: safe text rendering, prompt locks, keyboard focus continuity, edit/export round trip, desktop/mobile layout passed.')

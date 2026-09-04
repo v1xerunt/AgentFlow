@@ -12,6 +12,20 @@ For code changes, run `npm run typecheck` and the tests relevant to the changed 
 
 Keep English and Chinese text aligned. Keep generated output, local projects, credentials and archived evidence out of commits. Update the lockfile when dependencies change; preserve third-party notices when importing code or assets.
 
+### CI and UI checks
+
+CI runs type checking, the full unit suite and the offline panel check on Linux. Windows and macOS also run `test:platform`, covering desktop main-process and path tests. Each platform audits its dependencies, builds once, then checks login interactions, the CLI and Skill, and the packaged app. Windows additionally verifies update downloads and checksum rejection. `release:built` packages the output of a completed build; `release` builds first for standalone local use.
+
+After `npm run build`, run UI checks directly to reuse the build:
+
+```sh
+node apps/desktop/scripts/smoke-subscription-ui.cjs
+node apps/desktop/scripts/smoke-runtime-login.cjs
+node scripts/smoke-host-panel.cjs
+```
+
+These checks validate behavior and layout. For manual screenshot inspection, set `AGENTFLOW_CAPTURE_SCREENSHOTS=1` before running them (`export AGENTFLOW_CAPTURE_SCREENSHOTS=1` in Bash, or `$env:AGENTFLOW_CAPTURE_SCREENSHOTS='1'` in PowerShell). Images are written under `apps/desktop/out/` and `artifacts/host-panel/screenshots/`. Expected mock failures are identified in the log; unexpected errors retain their original output.
+
 ### Issues and pull requests
 
 Describe the problem, expected behavior and reproduction steps. Include the app version, operating system and CPU architecture. Review exported diagnostics for private information before attaching them.
@@ -35,6 +49,12 @@ The project may pursue separate commercial licensing. Including a contribution i
 代码修改应通过 `npm run typecheck` 及相关行为测试；运行时或依赖修改还需通过 `npm test` 和 `npm run build`。路径、后台进程、原生模块和打包变更应通过多平台发布工作流，并注明实际测试过的平台。
 
 同步维护中英文文案。提交时排除生成文件、本地项目、凭据和归档证据；依赖变更同步更新锁文件，引入第三方代码或素材时保留许可声明。
+
+### CI 与界面检查
+
+Linux 执行类型检查、完整单元测试和离线面板检查；Windows、macOS 还执行 `test:platform`，覆盖桌面主进程与路径测试。三平台各执行依赖审计、构建一次，再检查登录交互、CLI、Skill 和打包后的应用；Windows 额外验证更新下载和错误校验值拒绝。`release:built` 使用已完成的构建产物打包；本地单独执行 `release` 会先构建。
+
+运行 `npm run build` 后，可直接执行上方三个 Node 命令复用构建结果。这些检查验证交互行为和布局；需要人工查看截图时，设置 `AGENTFLOW_CAPTURE_SCREENSHOTS=1`，Bash 使用 `export AGENTFLOW_CAPTURE_SCREENSHOTS=1`，PowerShell 使用 `$env:AGENTFLOW_CAPTURE_SCREENSHOTS='1'`。截图写入 `apps/desktop/out/` 与 `artifacts/host-panel/screenshots/`。模拟的预期失败在日志中明确标记，其他错误保留原始输出。
 
 ### 提交问题与改进
 

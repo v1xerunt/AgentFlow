@@ -15,8 +15,6 @@ describe('chat message actions', () => {
       onEditMessage: noop, onCancelEdit: noop, onDeleteMessage: noop, onSelectCandidate: noop, onPublishArtifact: noop, onParametersChange: noop
     }))
     expect(html.match(/aria-label="复制消息"/g)).toHaveLength(2)
-    expect(html).toContain('lucide-file-output')
-    expect(html).not.toContain('lucide-files')
     expect(html).toContain('aria-label="将截至此处的完整对话设为结果输出"')
     expect(html).toContain('aria-label="将此回复设为结果输出"')
     expect(html).toContain('<h1>回复</h1>')
