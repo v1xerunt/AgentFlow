@@ -6,8 +6,15 @@ const { join, resolve, dirname, basename } = require('node:path')
 const { releaseMetadata, workspaces } = require('./release-metadata.cjs')
 const { installerNames, updateAssetNames, checkAssets } = require('./package-release.cjs')
 const { createHash } = require('node:crypto')
+const { spawnSync } = require('node:child_process')
 const { stringify } = require('yaml')
 const { assertDraft } = require('./publish-release.cjs')
+function inspectBuilder(environment = {}) {
+  return spawnSync(process.execPath, ['-e', "process.stdout.write(JSON.stringify(require('./apps/desktop/electron-builder.config.cjs')))"], {
+    cwd: resolve(__dirname, '..'), encoding: 'utf8', windowsHide: true,
+    env: { ...process.env, AGENTFLOW_REQUIRE_SIGNING: '0', CSC_LINK: '', CSC_NAME: '', CSC_KEY_PASSWORD: '', APPLE_ID: '', APPLE_APP_SPECIFIC_PASSWORD: '', APPLE_TEAM_ID: '', ...environment }
+  })
+}
 function fixture(run) {
   const root = mkdtempSync(join(tmpdir(), 'agentflow-release-test-'))
   try { run(root) } finally { if (dirname(root) === resolve(tmpdir()) && basename(root).startsWith('agentflow-release-test-')) rmSync(root, { recursive: true, force: true }) }
@@ -52,11 +59,29 @@ test('release assets must include every platform and corresponding source withou
 }))
 
 test('installer names describe the platform and match builder naming', () => {
-  const config = require('../apps/desktop/electron-builder.config.cjs')
+  const result = inspectBuilder()
+  assert.equal(result.status, 0, result.error?.message || result.stderr)
+  const config = JSON.parse(result.stdout)
   const name = (template, ext) => template.replace('${version}', '0.1.0').replace('${ext}', ext)
   assert.equal(name(config.win.artifactName, 'exe'), installerNames('0.1.0', 'win32')[0])
   assert.equal(name(config.mac.artifactName, 'dmg'), installerNames('0.1.0', 'darwin')[0])
   assert.equal(config.publish.repo, 'AgentFlow')
+})
+
+test('signed packaging requires its platform signing credentials', () => {
+  const result = inspectBuilder({ AGENTFLOW_REQUIRE_SIGNING: '1' })
+  if (process.platform === 'linux') {
+    assert.equal(result.status, 0, result.error?.message || result.stderr)
+    assert.equal(JSON.parse(result.stdout).forceCodeSigning, false)
+  } else {
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /A signing certificate \(CSC_LINK\) is required/)
+    if (process.platform === 'darwin') {
+      const notarization = inspectBuilder({ AGENTFLOW_REQUIRE_SIGNING: '1', CSC_LINK: 'test-certificate.p12' })
+      assert.equal(notarization.status, 1)
+      assert.match(notarization.stderr, /Apple notarization credentials are required/)
+    }
+  }
 })
 test('publication preserves published releases and drafts targeting another commit', () => {
   assertDraft({ draft: true, target_commitish: 'abc' }, 'abc')
