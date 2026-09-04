@@ -14,7 +14,7 @@ if (!existsSync(prebuild)) throw new Error(`Missing node-pty prebuild for ${plat
 if (!existsSync(join(desktop, 'out', 'main', 'index.js'))) throw new Error('Run the desktop build before staging')
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
-cpSync(join(desktop, 'out'), join(stage, 'out'), { recursive: true })
+for (const directory of ['main', 'preload', 'renderer']) cpSync(join(desktop, 'out', directory), join(stage, 'out', directory), { recursive: true })
 const notices = ['LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md']
 for (const name of notices) cpSync(join(desktop, '../..', name), join(stage, name))
 require('../../../scripts/collect-licenses.cjs')(desktop, join(stage, 'licenses'))
