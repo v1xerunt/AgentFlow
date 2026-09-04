@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.woff2 binary
+*.pdf binary
+apps/desktop/src/renderer/src/assets/fonts/LICENSE-*.txt -whitespace

@@ -1,0 +1,41 @@
+version: 1
+name: 产品方案评审
+goal: 为 AgentFlow 制定一个可以在 Windows 与 Apple Silicon Mac 上运行的原型方案，并进行严格评审。
+
+nodes:
+  requirements:
+    type: input
+    name: 产品需求
+    content: |
+      构建一个支持 GUI 与 CLI 的 AgentFlow 原型。
+      GUI 主面板是信息流 Graph；双击 Agent 节点进入对应聊天界面。
+    position: { x: 80, y: 220 }
+
+  planner:
+    type: agent
+    name: Claude Planner
+    provider: fake
+    model: planner-v1
+    basePrompt: 你是一名务实的产品架构师。
+    graphRolePrompt: 根据上游需求生成一份结构清楚、能够直接实施的原型方案。
+    position: { x: 390, y: 220 }
+
+  reviewer:
+    type: agent
+    name: GPT Reviewer
+    provider: fake
+    model: reviewer-v1
+    basePrompt: 你是一名严格的软件产品评审者。
+    graphRolePrompt: 审查上游方案，列出关键问题和可执行的修改建议。
+    position: { x: 720, y: 220 }
+
+links:
+  - id: requirements-planner
+    sourceId: requirements
+    targetId: planner
+    type: input
+
+  - id: planner-reviewer
+    sourceId: planner
+    targetId: reviewer
+    type: review

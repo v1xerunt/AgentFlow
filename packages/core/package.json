@@ -1,0 +1,32 @@
+{
+  "name": "@agentflow/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./host-run": "./src/host-run.ts",
+    "./localization": "./src/localization/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agentflow/schema": "0.1.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/v1xerunt/AgentFlow.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/v1xerunt/AgentFlow",
+  "bugs": {
+    "url": "https://github.com/v1xerunt/AgentFlow/issues"
+  }
+}

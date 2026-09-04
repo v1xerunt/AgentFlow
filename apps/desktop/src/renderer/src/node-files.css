@@ -1,0 +1,21 @@
+.node-file-list { display: grid; gap: 8px; min-width: 0; }
+.node-file-row { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); cursor: grab; }
+.node-file-row.is-selected, .input-item.is-selected { border-color: var(--blue); background: var(--blue-soft); }
+.node-file-row.is-hidden, .input-item.is-hidden { background: var(--sidebar); border-style: dashed; }
+.node-file-row.is-hidden.is-selected, .input-item.is-hidden.is-selected { border-color: var(--blue); }
+.node-file-row__heading { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.node-file-row__select { display: flex; align-items: center; flex: 1; min-width: 0; gap: 5px; padding: 0; text-align: left; background: transparent; border: 0; cursor: inherit; }
+.node-file-row__select span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-ui); font-weight: 500; color: var(--ink); }
+.node-file-row__select svg { flex: none; color: var(--muted); }
+.node-file-row__actions, .input-item__file-actions { display: flex; align-items: center; flex: none; gap: 2px; }
+.node-file-row__actions button, .input-item__file-actions button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+.node-file-row__actions button:hover:not(:disabled), .input-item__file-actions button:hover:not(:disabled) { background: var(--line); }
+.node-file-row__actions button:disabled, .input-item__file-actions button:disabled { opacity: .5; cursor: default; }
+.node-file-row small { display: block; margin-top: 6px; color: var(--muted); font-size: var(--font-size-helper); }
+.node-file-row__preview { margin: 10px 0 0; font-size: var(--font-size-ui); white-space: pre-wrap; overflow-wrap: anywhere; }
+.node-files-hint, .node-files-empty { margin: 4px 0; color: var(--muted); font-size: var(--font-size-helper); }
+.node-file-list.is-compact { max-height: 190px; overflow-y: auto; gap: 4px; padding: 0 10px 10px; }
+.node-file-list.is-compact .node-file-row { padding: 4px; border-radius: 6px; }
+.node-file-list.is-compact .node-file-row__select span { font-size: var(--font-size-helper); }
+.flow-output-node > .node-file-list { grid-column: 1 / -1; width: 100%; padding: 0; }
+.input-item__file-actions { grid-column: 5; }

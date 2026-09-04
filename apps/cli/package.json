@@ -1,0 +1,33 @@
+{
+  "name": "@agentflow/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "agentflow": "dist/index.js"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agentflow/core": "0.1.0",
+    "@agentflow/schema": "0.1.0",
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3",
+    "tsup": "^8.5.0"
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/v1xerunt/AgentFlow.git",
+    "directory": "apps/cli"
+  },
+  "homepage": "https://github.com/v1xerunt/AgentFlow",
+  "bugs": {
+    "url": "https://github.com/v1xerunt/AgentFlow/issues"
+  }
+}

@@ -1,0 +1,28 @@
+.tutorial-spotlight { position: fixed; inset: 0; z-index: 460; pointer-events: none; }
+.tutorial-spotlight__mask { position: absolute; inset: 0; }
+.tutorial-spotlight__card { position: absolute; pointer-events: auto; box-sizing: border-box; padding: 19px 18px 12px; border: 1px solid #deded4; border-radius: 12px; background: #fafaf6; color: #252923; box-shadow: 0 12px 42px #0003; }
+.tutorial-spotlight button { border: 0; background: none; color: inherit; cursor: pointer; padding: 4px; font: inherit; }
+.tutorial-spotlight button:hover { background: #e9ece2; border-radius: 4px; }
+.tutorial-spotlight button:focus-visible { outline: 2px solid #657a45; outline-offset: 2px; }
+.tutorial-spotlight button:disabled { opacity: .35; cursor: default; }
+.tutorial-spotlight .tutorial-close { position: absolute; top: 12px; right: 10px; display: grid; place-items: center; }
+.tutorial-spotlight h2 { font-size: 16px; line-height: 1.45; margin: 0 17px 9px 0; }
+.tutorial-spotlight p { margin: 0; font-size: 13px; line-height: 1.75; color: #4c5147; }
+.tutorial-spotlight__footer, .tutorial-spotlight__footer button { display: flex; align-items: center; gap: 5px; }
+.tutorial-spotlight__footer { justify-content: space-between; border-top: 1px solid #e4e5dd; margin-top: 14px; padding-top: 9px; font-size: 11px; }
+.tutorial-spotlight__footer span { color: #68705f; font-variant-numeric: tabular-nums; }
+.tutorial-spotlight .tutorial-overview-done { margin-top: 14px; padding: 8px 12px; border-radius: 6px; background: #30372b; color: #fff; font-size: 12px; }
+.tutorial-spotlight .tutorial-overview-done:hover { background: #45503c; }
+.tutorial-button-ring, .tutorial-point-ring { fill: none; stroke: #e0efb9; stroke-width: 2.5; animation: tutorial-breathe 1.6s ease-in-out infinite; }
+.tutorial-point-pulse { fill: none; stroke: #d7ef9e; stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: tutorial-expand 1.6s ease-out infinite; }
+.tutorial-drag-path { fill: none; stroke: #c4dd89; stroke-width: 2; stroke-dasharray: 5 6; animation: tutorial-flow 1.8s linear infinite; }
+.tutorial-link-trace { fill: none; stroke: #bad77c; stroke-width: 3; stroke-dasharray: 7 5; animation: tutorial-flow 1.2s linear infinite; }
+.tutorial-refocus { animation: tutorial-remind .28s ease-in-out 3; }
+@keyframes tutorial-breathe { 50% { stroke: #a9cc62; stroke-width: 4; } }
+@keyframes tutorial-expand { from { transform: scale(.8); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
+@keyframes tutorial-flow { to { stroke-dashoffset: -44; } }
+@keyframes tutorial-remind { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .tutorial-button-ring, .tutorial-point-ring, .tutorial-point-pulse, .tutorial-drag-path, .tutorial-link-trace, .tutorial-refocus { animation: none; } .tutorial-point-pulse { opacity: .4; } }
+.node-library-toolbar, .flow-action-dock { flex-shrink: 0; }
+.graph-layout[data-tutorial-overview="true"] { grid-template-columns: minmax(0, 1fr); }
+.graph-layout[data-tutorial-overview="true"] > .inspector { display: none; }

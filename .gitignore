@@ -1,0 +1,73 @@
+# Dependencies and package-manager caches
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+
+# Compiled applications, installers and test output
+dist/
+dist-web/
+out/
+release/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+*.log
+
+# Local work, historical material and generated QA evidence
+/.tmp/
+/archive/
+/artifacts/
+/.impeccable/
+/.codex/
+/.agents/
+/.claude/
+
+# Public documentation allowlist; planning and working notes stay local
+/*.md
+!/README.md
+!/README.zh-CN.md
+!/CONTRIBUTING.md
+!/THIRD_PARTY_NOTICES.md
+/docs/*
+!/docs/assets/
+!/docs/cli.md
+!/docs/cli.zh-CN.md
+
+# Tool caches
+.cache/
+.vite/
+
+# Local AgentFlow projects and application data
+.flow/
+.agentflow/
+/examples/customer-weekly-brief/
+
+# Credentials and signing material (keep example configuration files)
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+
+# OS metadata and local editor state
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~

@@ -1,0 +1,65 @@
+{
+  "name": "@agentflow/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "generate:icons": "node scripts/generate-icons.cjs",
+    "dev": "electron-vite dev --watch",
+    "dev:web": "vite --config vite.web.config.ts --host 127.0.0.1",
+    "build": "electron-vite build",
+    "stage:release": "node scripts/stage-release.cjs",
+    "test:release": "node scripts/smoke-release.cjs",
+    "pack": "npm run build && npm run stage:release && electron-builder --config electron-builder.config.cjs --dir --publish never",
+    "release": "npm run build && npm run stage:release && electron-builder --config electron-builder.config.cjs --publish never",
+    "build:web": "vite build --config vite.web.config.ts",
+    "test:preload": "electron-vite build && node scripts/smoke-preload.cjs",
+    "test:branding": "electron-vite build && node scripts/smoke-branding.cjs",
+    "test:diagnostics": "electron-vite build && node scripts/smoke-diagnostics.cjs",
+    "test:node-files": "electron-vite build && node scripts/smoke-node-files.cjs",
+    "test:agent-runs": "electron-vite build && node scripts/smoke-agent-runs.cjs",
+    "test:subscription-ui": "electron-vite build && node scripts/smoke-subscription-ui.cjs",
+    "test:tutorial": "electron-vite build && node scripts/smoke-tutorial.cjs",
+    "test": "vitest run src",
+    "test:runtime-login": "electron-vite build && node scripts/smoke-runtime-login.cjs",
+    "test:flow-viewport": "electron-vite build && node scripts/smoke-flow-viewport.cjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agentflow/core": "0.1.0",
+    "@agentflow/schema": "0.1.0",
+    "@lobehub/icons-static-svg": "1.94.0",
+    "@xyflow/react": "^12.8.4",
+    "cross-spawn": "^7.0.6",
+    "lucide-react": "^0.468.0",
+    "mammoth": "^1.10.0",
+    "node-pty": "1.2.0-beta.15",
+    "pdfjs-dist": "6.2.108",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "electron-builder": "26.15.3",
+    "electron-vite": "^4.0.0",
+    "vite": "^7.0.4"
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/v1xerunt/AgentFlow.git",
+    "directory": "apps/desktop"
+  },
+  "homepage": "https://github.com/v1xerunt/AgentFlow",
+  "bugs": {
+    "url": "https://github.com/v1xerunt/AgentFlow/issues"
+  }
+}

@@ -1,0 +1,29 @@
+name: Bug report / 问题反馈
+description: Report a reproducible issue with AgentFlow.
+body:
+  - type: input
+    id: version
+    attributes:
+      label: AgentFlow version / 应用版本
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and CPU / 操作系统与架构
+      placeholder: Windows 11 x64 / macOS 15 Apple Silicon / Ubuntu 22.04 x64
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      description: Include what you expected and what happened. 请说明操作步骤、预期和实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Screenshots or diagnostics / 截图或诊断报告
+      description: Export from Help → Logs and diagnostics. Review private information before attaching. 可从帮助菜单导出，请先检查私人信息。

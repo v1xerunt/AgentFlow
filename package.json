@@ -1,0 +1,45 @@
+{
+  "name": "agentflow-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @agentflow/desktop",
+    "dev:web": "npm run dev:web --workspace @agentflow/desktop",
+    "build": "npm run build --workspace @agentflow/desktop && npm run build --workspace @agentflow/cli",
+    "pack": "npm run pack --workspace @agentflow/desktop",
+    "release": "npm run release --workspace @agentflow/desktop",
+    "cli": "tsx apps/cli/src/index.ts",
+    "skill:build": "npm run build --workspace @agentflow/cli && node scripts/package-skill.mjs",
+    "skill:install": "node scripts/install-skill.mjs",
+    "test:host": "node scripts/smoke-host.cjs",
+    "test:host-panel": "node scripts/smoke-host-panel.cjs",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  },
+  "devDependencies": {
+    "electron": "^44.1.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "description": "Visual multi-agent workflows for LLMs and coding agents",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/v1xerunt/AgentFlow.git"
+  },
+  "homepage": "https://github.com/v1xerunt/AgentFlow",
+  "bugs": {
+    "url": "https://github.com/v1xerunt/AgentFlow/issues"
+  }
+}

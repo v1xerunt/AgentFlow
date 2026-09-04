@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "name": "示例：项目周报审阅",
+  "goal": "根据提供的项目进度写一份不超过 250 字的中文周报，包含本周完成、风险和下周计划。",
+  "nodes": {
+    "brief": {
+      "type": "input",
+      "name": "本周进度",
+      "items": [{
+        "id": "progress",
+        "name": "示例进度材料",
+        "kind": "text",
+        "mode": "text",
+        "content": "以下为演示材料：本周完成登录页面和 CSV 导出；移动端布局还未验收；导出大文件时内存占用偏高，负责人林宁将在周二复测；下周计划完成移动端验收并优化导出内存。不得添加材料中没有的日期、比例、指标或完成状态。"
+      }]
+    },
+    "writer": {
+      "type": "agent", "name": "周报撰写", "provider": "host", "model": "inherit",
+      "prompts": {
+        "system": {"content": "你负责将项目进度写成简洁、准确的团队周报。以提供材料为事实依据，区分已经完成和计划中的工作。", "customized": true, "locked": false},
+        "input": {"content": "阅读进度材料，提炼本周完成的事项、当前风险和下周计划。", "customized": true, "locked": false},
+        "output": {"content": "返回完整中文周报，包含本周完成、风险、下周计划三个部分，总计不超过 250 字。", "customized": true, "locked": false}
+      }
+    },
+    "reviewer": {
+      "type": "agent", "name": "事实与完整性审阅", "provider": "host", "model": "inherit",
+      "prompts": {
+        "system": {"content": "你负责核对周报的事实、工作状态和完整性。逐项用原始材料核验，优先指出影响理解的错误。", "customized": true, "locked": false},
+        "input": {"content": "对照原始进度材料审查所附周报，检查完成与计划是否混淆、关键风险是否遗漏，以及是否引入没有依据的说法。", "customized": true, "locked": false},
+        "output": {"content": "返回可操作的审阅意见，引用对应原文并说明修改建议；没有问题时给出明确结论。", "customized": true, "locked": false}
+      }
+    },
+    "reviser": {
+      "type": "agent", "name": "周报定稿", "provider": "host", "model": "inherit",
+      "prompts": {
+        "system": {"content": "你负责根据审阅意见完成周报定稿。保留有效事实，纠正明确错误，以团队可直接使用的成品为目标。", "customized": true, "locked": false},
+        "input": {"content": "根据提供的周报草稿和审阅意见进行修订。", "customized": true, "locked": false},
+        "output": {"content": "仅返回完整的最终中文周报，包含本周完成、风险、下周计划三个部分，总计不超过 250 字。", "customized": true, "locked": false}
+      }
+    }
+  },
+  "links": [
+    {"id": "brief-writer", "sourceId": "brief", "targetId": "writer", "type": "input"},
+    {"id": "brief-reviewer", "sourceId": "brief", "targetId": "reviewer", "type": "input"},
+    {"id": "writer-reviewer", "sourceId": "writer", "targetId": "reviewer", "type": "review"},
+    {"id": "draft-feedback-reviser", "sourceIds": ["writer", "reviewer"], "targetId": "reviser", "type": "merge"}
+  ]
+}

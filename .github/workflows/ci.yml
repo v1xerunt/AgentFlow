@@ -1,0 +1,169 @@
+name: Build and release
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      signed:
+        description: Sign Windows and notarize macOS packages (requires signing secrets)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agentflow-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: win32
+            arch: x64
+            certificate: WINDOWS_CSC_LINK
+            password: WINDOWS_CSC_KEY_PASSWORD
+          - os: macos-15
+            platform: darwin
+            arch: arm64
+            certificate: MACOS_CSC_LINK
+            password: MACOS_CSC_KEY_PASSWORD
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x64
+            certificate: ''
+            password: ''
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      AGENTFLOW_REQUIRE_SIGNING: ${{ ((github.event_name == 'workflow_dispatch' && inputs.signed) || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && vars.AGENTFLOW_SIGN_RELEASES == 'true')) && '1' || '0' }}
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          architecture: ${{ matrix.arch }}
+          cache: npm
+      - name: Check versions and tag
+        id: metadata
+        run: node scripts/release-metadata.cjs
+      - name: Check native architecture
+        run: node -e "if(process.platform!=='${{ matrix.platform }}'||process.arch!=='${{ matrix.arch }}') process.exit(1)"
+      - name: Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libfuse2
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: node --test scripts/release.test.cjs
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Standalone CLI and PDF worker
+        run: |
+          node scripts/smoke-cli.cjs
+          node scripts/smoke-pdf.cjs
+      - name: Package and verify the matching skill runtime
+        run: |
+          node scripts/package-skill.mjs
+          node scripts/smoke-host.cjs
+      - name: Offline skill panel
+        if: runner.os != 'Linux'
+        run: node scripts/smoke-host-panel.cjs
+      - name: Offline skill panel on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/smoke-host-panel.cjs
+      - name: Build installers
+        env:
+          CSC_LINK: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && matrix.certificate && secrets[matrix.certificate] || '' }}
+          CSC_KEY_PASSWORD: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && matrix.password && secrets[matrix.password] || '' }}
+          APPLE_ID: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ env.AGENTFLOW_REQUIRE_SIGNING == '1' && runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+        run: npm run release
+      - name: Packaged app, persistence and native terminal
+        if: runner.os != 'Linux'
+        run: npm run test:release --workspace @agentflow/desktop
+      - name: Packaged app on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:release --workspace @agentflow/desktop
+      - name: Collect desktop packages
+        run: node scripts/package-release.cjs desktop
+      - name: Archive CLI and skill
+        if: runner.os == 'Linux'
+        run: node scripts/package-release.cjs portable
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packages-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  assemble:
+    name: Assemble release assets
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: packages-*
+          path: dist/release/
+          merge-multiple: true
+      - name: Verify all packages and add corresponding source, checksums and notes
+        run: node scripts/package-release.cjs assemble
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: AgentFlow-${{ needs.build.outputs.version }}-release
+          path: |
+            dist/release/AgentFlow-*
+            dist/release/SHA256SUMS.txt
+            dist/release/BUILD_INFO.json
+            dist/release/RELEASE_NOTES.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  draft:
+    name: Create GitHub Release draft
+    needs: [build, assemble]
+    if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: AgentFlow-${{ needs.build.outputs.version }}-release
+          path: dist/release/
+      - name: Upload packages to the version's draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-release.cjs

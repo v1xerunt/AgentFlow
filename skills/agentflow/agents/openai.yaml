@@ -1,0 +1,4 @@
+interface:
+  display_name: "AgentFlow"
+  short_description: "Build and run explicit flows with your current agent"
+  default_prompt: "Use $agentflow to turn my task into a Flow and execute it with this session's model."
