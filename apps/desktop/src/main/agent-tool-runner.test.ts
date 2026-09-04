@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, delimiter, dirname, join } from 'node:path'
 import { agentToolExitErrorMessage, claudeConfigCapabilities, claudeReasoningEffortsForModel, detectAgentTool, invokeAgentTool, invokeAgentToolWithRefresh, parseKimiConfigCapabilities, parseStructuredLine } from './agent-tool-runner'
@@ -19,10 +19,16 @@ describe('managed runtime exclusion', () => {
   })
 
   it('resolves PATH commands before excluding managed runtimes', async () => {
-    vi.stubEnv('PATH', dirname(process.execPath))
-    const command = basename(process.execPath)
-    expect(await detectAgentTool({ id: 'test', name: 'Test', command })).toMatchObject({ installed: true, resolvedCommand: process.execPath })
-    expect(await detectAgentTool({ id: 'test', name: 'Test', command }, [process.execPath])).toEqual({ installed: false })
+    const directory = await mkdtemp(join(tmpdir(), 'agentflow-managed-runtime-'))
+    try {
+      const command = `agentflow-test-runtime${process.platform === 'win32' ? '.exe' : ''}`
+      const executable = join(directory, command)
+      await copyFile(process.execPath, executable)
+      if (process.platform !== 'win32') await chmod(executable, 0o755)
+      vi.stubEnv('PATH', directory)
+      expect(await detectAgentTool({ id: 'test', name: 'Test', command })).toMatchObject({ installed: true, resolvedCommand: await realpath(executable) })
+      expect(await detectAgentTool({ id: 'test', name: 'Test', command }, [executable])).toEqual({ installed: false })
+    } finally { await rm(directory, { recursive: true, force: true }) }
   })
 
   it('keeps an independent local installation when the first PATH candidate is managed', async () => {
@@ -32,7 +38,7 @@ describe('managed runtime exclusion', () => {
       await copyFile(process.execPath, independent)
       if (process.platform !== 'win32') await chmod(independent, 0o755)
       vi.stubEnv('PATH', `${dirname(process.execPath)}${delimiter}${directory}`)
-      expect(await detectAgentTool({ id: 'test', name: 'Test', command: basename(process.execPath) }, [process.execPath])).toMatchObject({ installed: true, resolvedCommand: independent })
+      expect(await detectAgentTool({ id: 'test', name: 'Test', command: basename(process.execPath) }, [process.execPath])).toMatchObject({ installed: true, resolvedCommand: await realpath(independent) })
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
 
@@ -48,7 +54,7 @@ describe('managed runtime exclusion', () => {
       vi.stubEnv('USERPROFILE', directory)
       vi.stubEnv('HOME', directory)
       const tool = { id: 'agent-tool:antigravity', name: 'Antigravity', command: 'agy' }
-      expect(await detectAgentTool(tool)).toMatchObject({ installed: true, resolvedCommand: command })
+      expect(await detectAgentTool(tool)).toMatchObject({ installed: true, resolvedCommand: await realpath(command) })
       expect(await detectAgentTool(tool, [command.toUpperCase()])).toEqual({ installed: false })
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
