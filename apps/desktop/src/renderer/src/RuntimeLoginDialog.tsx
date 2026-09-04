@@ -42,7 +42,7 @@ export function RuntimeLoginDialog({ progress, onClose }: { progress: RuntimeLog
       <span className="dialog-icon">{progress.phase === 'connected' ? <CircleCheck size={18} /> : progress.phase === 'error' ? <TriangleAlert size={18} /> : <KeyRound size={18} />}</span>
       <div><h2 id="runtime-login-title">{t("Sign in")} {accountName}</h2><p>{t("Connect your account through the official {0} runtime", [runtimeName])}</p></div>
     </div>
-    {isClaude && !done ? <p className="runtime-login-notice">{t("Initialization uses default settings. Claude can make mistakes; check its output and use it only in trusted projects.")}</p> : null}
+    {isClaude && !done ? <p className="runtime-login-notice">{t("Login uses the official Claude Code runtime. Claude can make mistakes; check its output and use it only in trusted projects.")}</p> : null}
     <p id="runtime-login-message" className="runtime-login-message" role={progress.phase === 'error' ? 'alert' : 'status'}>{!done && !awaitingCode ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : null}{localizeAppMessage(progress.message)}</p>
     {!done && progress.authUrl ? <a className="runtime-login-link" href={progress.authUrl} target="_blank" rel="noreferrer">{t("Open {0} login page", [accountName])}</a> : null}
     <form onSubmit={event => {

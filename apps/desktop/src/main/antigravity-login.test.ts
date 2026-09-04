@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AntigravityLoginService, type LoginTerminal } from './antigravity-login'
+import { AntigravityLoginService, antigravityAuthUrl, type LoginTerminal } from './antigravity-login'
 import type { RuntimeLoginProgress } from '../shared/llm'
 
 const options = { command: '/runtime/agy', cwd: '/runtime/login', env: { PATH: '/runtime' } }
-const url = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test&redirect_uri=https%3A%2F%2Fexample.test&state=test'
+const url = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test&redirect_uri=https%3A%2F%2Fexample.test&response_type=code&scope=openid&state=test&code_challenge=challenge&code_challenge_method=S256'
 afterEach(() => vi.useRealTimers())
 
 function harness(probe = vi.fn(async () => false)) {
@@ -32,6 +32,14 @@ function harness(probe = vi.fn(async () => false)) {
 }
 
 describe('Antigravity interactive login', () => {
+  it('prefers a valid terminal hyperlink and rejects duplicated OAuth parameters', () => {
+    const corrupted = `${url}&client_id=test&scope=openid&state=other`
+    const hyperlink = `\x1b]8;;${url}\x1b\\Open Google login\x1b]8;;\x1b\\`
+    expect(antigravityAuthUrl(`${corrupted}\r\n${hyperlink}`)).toBe(url)
+    expect(antigravityAuthUrl(corrupted)).toBeUndefined()
+    expect(antigravityAuthUrl(url.replace('accounts.google.com', 'accounts.google.example'))).toBeUndefined()
+  })
+
   it('selects Google OAuth, handles split URLs, and sends the code only into the PTY', async () => {
     const h = harness()
     await h.ready()

@@ -1,7 +1,9 @@
 import { t } from '@agentflow/core/localization'
+import type { ClientContext, NewSessionResponse, ResumeSessionResponse } from '@agentclientprotocol/sdk'
 import { mkdir, readFile, readdir, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { delimiter, extname, isAbsolute, join, relative, resolve } from 'node:path'
+import { delimiter, extname, isAbsolute, join, posix, relative, resolve } from 'node:path'
+import { Readable, Writable } from 'node:stream'
 import type { ModelInvocationResult, ModelOutputFile } from '@agentflow/core'
 import type { AgentParameters } from '@agentflow/schema'
 import type { AgentToolConfiguration } from '../shared/llm'
@@ -9,6 +11,7 @@ import { runtimeEnvironment, spawnManaged, terminateProcessTree } from './platfo
 import { resolveWorkspaceTarget } from './workspace-paths'
 
 type AgentToolIdentity = Pick<AgentToolConfiguration, 'id' | 'name' | 'command'>
+type AcpSdk = typeof import('@agentclientprotocol/sdk')
 
 export interface AgentToolRuntimeConfiguration extends AgentToolIdentity {
   enabled: boolean
@@ -207,6 +210,9 @@ export async function invokeAgentTool(
   signal?.throwIfAborted()
   if (!tool.enabled) throw new Error(t("{0} is disabled in settings", [tool.name]))
   if (request.outputDirectory) await prepareOutputDirectory(request.workspacePath, request.outputDirectory.path)
+  if (request.providerId === 'agent-tool:kimi-code' || request.providerId === 'subscription:kimi-code') {
+    return invokeKimiAcp(tool, request, onDelta, signal)
+  }
   const template = request.externalSessionId ? tool.resumeArgs : tool.args
   const args = renderArgs(template, request)
   signal?.throwIfAborted()
@@ -216,7 +222,7 @@ export async function invokeAgentTool(
       ? { ...(tool.env ?? process.env), KIMI_MODEL_THINKING_EFFORT: tool.reasoning }
       : tool.env ?? process.env
   })
-  child.stdin.end(request.prompt)
+  child.stdin.end(agentToolStdin(request.providerId, request.prompt))
 
   let stdout = ''
   let stderr = ''
@@ -277,6 +283,144 @@ export async function invokeAgentTool(
     externalSessionId,
     files
   }
+}
+
+async function invokeKimiAcp(
+  tool: AgentToolRuntimeConfiguration,
+  request: AgentToolInvocation,
+  onDelta: (delta: string) => void,
+  signal?: AbortSignal
+): Promise<ModelInvocationResult> {
+  const { client: acpClient, methods: acpMethods, ndJsonStream, PROTOCOL_VERSION } = await loadKimiAcpSdk(request.providerId, tool.name, signal)
+  const template = request.externalSessionId ? tool.resumeArgs : tool.args
+  const child = spawnManaged(tool.command, renderArgs(template, request), {
+    cwd: request.workspacePath,
+    env: tool.reasoning ? { ...(tool.env ?? process.env), KIMI_MODEL_THINKING_EFFORT: tool.reasoning } : tool.env ?? process.env
+  })
+  let stderr = ''
+  let content = ''
+  let sessionId = request.externalSessionId
+  let context: ClientContext | undefined
+  let abortTimer: ReturnType<typeof setTimeout> | undefined
+  child.stderr.setEncoding('utf8')
+  child.stderr.on('data', (chunk: string) => { stderr = `${stderr}${chunk}`.slice(-256_000) })
+  const launchFailure = new Promise<never>((_resolve, reject) => child.once('error', reject))
+  const closed = new Promise<number>((resolve) => child.once('close', (code) => {
+    if (abortTimer) clearTimeout(abortTimer)
+    resolve(code ?? 1)
+  }))
+  const abort = () => {
+    if (context && sessionId) void context.notify(acpMethods.agent.session.cancel, { sessionId }).catch(() => {})
+    abortTimer = setTimeout(() => terminateProcessTree(child), 250)
+  }
+  signal?.addEventListener('abort', abort, { once: true })
+
+  const app = acpClient({ name: 'AgentFlow' })
+    .onRequest(acpMethods.client.session.requestPermission, () => ({ outcome: { outcome: 'cancelled' } }))
+    .onRequest(acpMethods.client.elicitation.create, () => ({ action: 'cancel' }))
+    .onNotification(acpMethods.client.session.update, ({ params }) => {
+      if (params.sessionId !== sessionId || params.update.sessionUpdate !== 'agent_message_chunk' || params.update.content.type !== 'text') return
+      content += params.update.content.text
+      onDelta(params.update.content.text)
+    })
+
+  let exitCode = 1
+  try {
+    await Promise.race([
+      app.connectWith(ndJsonStream(
+        Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
+        Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>
+      ), async (client) => {
+        context = client
+        await client.request(acpMethods.agent.initialize, {
+          protocolVersion: PROTOCOL_VERSION,
+          clientCapabilities: {},
+          clientInfo: { name: 'AgentFlow', version: '0.1.0' }
+        })
+        let session: NewSessionResponse | ResumeSessionResponse
+        if (sessionId) {
+          session = await client.request(acpMethods.agent.session.resume, { sessionId, cwd: request.workspacePath, mcpServers: [] })
+        } else {
+          const created = await client.request(acpMethods.agent.session.new, { cwd: request.workspacePath, mcpServers: [] })
+          sessionId = created.sessionId
+          session = created
+        }
+        await client.request(acpMethods.agent.session.setMode, { sessionId, modeId: 'auto' })
+        if (tool.model) await configureKimiAcpOption(client, session, sessionId, 'model', tool.model, acpMethods)
+        if (tool.reasoning) await configureKimiAcpOption(client, session, sessionId, 'thought_level', tool.reasoning, acpMethods)
+        const result = await client.request(acpMethods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text: request.prompt }] })
+        if (result.stopReason === 'cancelled') throw new DOMException('The operation was aborted', 'AbortError')
+        if (result.stopReason === 'refusal') throw new Error(t('The provider reported an error: {0}', ['Kimi Code refused the request']))
+      }),
+      launchFailure
+    ])
+    if (!child.stdin.destroyed) child.stdin.end()
+    const closeTimer = setTimeout(() => terminateProcessTree(child), 2000)
+    exitCode = await closed.finally(() => clearTimeout(closeTimer))
+    signal?.throwIfAborted()
+  } catch (error) {
+    terminateProcessTree(child)
+    signal?.throwIfAborted()
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    const detail = [error instanceof Error ? error.message : String(error), stderr.trim()].filter(Boolean).join('\n')
+    throw new Error(agentToolExitErrorMessage(request.providerId, tool.name, 1, '', detail))
+  } finally {
+    signal?.removeEventListener('abort', abort)
+  }
+  if (exitCode !== 0) throw new Error(agentToolExitErrorMessage(request.providerId, tool.name, exitCode, '', stderr))
+
+  const files = request.outputDirectory ? await collectOutputDirectory(request.workspacePath, request.outputDirectory, content) : undefined
+  if (!content.trim() && !files?.length) throw new Error(t("{0} finished without returning text or output files", [tool.name]))
+  return {
+    content: content.trim() || t("Output files generated: {0}", [files?.length ?? 0]),
+    providerId: request.providerId,
+    model: tool.model || request.model,
+    externalSessionId: sessionId,
+    files
+  }
+}
+
+export async function loadKimiAcpSdk(
+  providerId: string,
+  toolName: string,
+  signal?: AbortSignal,
+  loader: () => Promise<AcpSdk> = () => import('@agentclientprotocol/sdk')
+) {
+  signal?.throwIfAborted()
+  try {
+    const sdk = await loader()
+    signal?.throwIfAborted()
+    return sdk
+  } catch (error) {
+    signal?.throwIfAborted()
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(agentToolExitErrorMessage(providerId, toolName, 1, '', detail))
+  }
+}
+
+async function configureKimiAcpOption(
+  client: ClientContext,
+  session: NewSessionResponse | ResumeSessionResponse,
+  sessionId: string,
+  category: string,
+  value: string,
+  methods: AcpSdk['methods']
+) {
+  const option = session.configOptions?.find((candidate) => candidate.category === category || candidate.id === category)
+  if (option) {
+    await client.request(methods.agent.session.setConfigOption, { sessionId, configId: option.id, value })
+    return
+  }
+  if (category === 'model') {
+    await client.request<void, { sessionId: string; modelId: string }>('session/set_model', { sessionId, modelId: value })
+  }
+}
+
+function agentToolStdin(providerId: string, prompt: string) {
+  if (providerId === 'agent-tool:antigravity' || providerId === 'subscription:antigravity') {
+    return `${JSON.stringify({ event: 'user', message: { content: prompt } })}\n`
+  }
+  return prompt
 }
 
 export async function invokeAgentToolWithRefresh(
@@ -491,9 +635,15 @@ async function commandCandidates(tool: AgentToolIdentity) {
   } else {
     if (userHome) candidates.push(join(userHome, '.local', 'bin', executable))
     candidates.push(join('/usr/local/bin', executable), join('/opt/homebrew/bin', executable))
+    if (process.platform === 'darwin' && tool.id === 'agent-tool:codex') candidates.push(...macCodexDesktopCandidates(userHome))
   }
 
   return [...new Set(candidates)]
+}
+
+export function macCodexDesktopCandidates(userHome?: string) {
+  const suffix = posix.join('ChatGPT.app', 'Contents', 'Resources', 'codex')
+  return [posix.join('/Applications', suffix), ...(userHome ? [posix.join(userHome, 'Applications', suffix)] : [])]
 }
 
 function commandIdentity(command: string) {

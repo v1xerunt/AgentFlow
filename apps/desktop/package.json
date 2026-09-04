@@ -27,6 +27,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "1.4.0",
     "@agentflow/core": "0.1.0",
     "@agentflow/schema": "0.1.0",
     "@lobehub/icons-static-svg": "1.94.0",

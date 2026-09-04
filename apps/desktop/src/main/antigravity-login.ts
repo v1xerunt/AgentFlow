@@ -18,6 +18,24 @@ export interface AntigravityLoginDependencies {
   openExternal(url: string): Promise<void>
 }
 
+export function antigravityAuthUrl(raw: string) {
+  const hyperlinks = [...raw.matchAll(/\x1b\]8;[^;]*;([^\x07\x1b]+)(?:\x07|\x1b\\)/g)]
+    .flatMap(match => match[1] ? [match[1]] : [])
+  const visible = stripVTControlCharacters(raw).match(/https:\/\/[^\s<>"']+/g) ?? []
+  for (const value of [...hyperlinks, ...visible]) {
+    try {
+      const url = new URL(value)
+      const allowedPath = url.pathname === '/o/oauth2/auth' || url.pathname === '/o/oauth2/v2/auth'
+      const required = ['client_id', 'redirect_uri', 'response_type', 'scope', 'state', 'code_challenge', 'code_challenge_method']
+      const parametersAreSingular = [...new Set(url.searchParams.keys())]
+        .every(name => url.searchParams.getAll(name).length === 1)
+      if (url.origin === 'https://accounts.google.com' && allowedPath && !url.username && !url.password
+        && required.every(name => Boolean(url.searchParams.get(name))) && parametersAreSingular) return url.toString()
+    } catch { /* Ignore incomplete URL fragments while the PTY is still rendering. */ }
+  }
+  return undefined
+}
+
 export class AntigravityLoginService {
   private active?: { id: string; submit(code: string): void; cancel(): void }
 
@@ -118,14 +136,7 @@ export class AntigravityLoginService {
             return
           }
           if (awaitingCode || !/authorization code|code displayed in the browser/i.test(text)) return
-          const urls = text.match(/https:\/\/[^\s<>"'\x1b]+/g) ?? []
-          authUrl = urls.find(value => {
-            try {
-              const url = new URL(value)
-              return url.origin === 'https://accounts.google.com' && !url.username && !url.password
-                && url.searchParams.has('client_id') && url.searchParams.has('redirect_uri') && url.searchParams.has('state')
-            } catch { return false }
-          })
+          authUrl = antigravityAuthUrl(buffer)
           if (!authUrl) return
           awaitingCode = true
           clearTimeout(startupTimeout)

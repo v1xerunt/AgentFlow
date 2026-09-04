@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -24,8 +24,9 @@ describe('mergeWorkspaceDirectories', () => {
     const { source } = await createDirectories()
     await mkdir(join(source, 'outputs'))
     await writeFile(join(source, 'outputs', 'answer.md'), '# Answer')
-    expect(await resolveWorkspaceFile(source, 'outputs/answer.md')).toBe(join(source, 'outputs', 'answer.md'))
-    expect(await resolveWorkspaceFile(source, '.\\outputs\\answer.md')).toBe(join(source, 'outputs', 'answer.md'))
+    const expected = await realpath(join(source, 'outputs', 'answer.md'))
+    expect(await resolveWorkspaceFile(source, 'outputs/answer.md')).toBe(expected)
+    expect(await resolveWorkspaceFile(source, '.\\outputs\\answer.md')).toBe(expected)
   })
 
   it('prevents a merge from writing through a target symlink or into a nested workspace', async () => {

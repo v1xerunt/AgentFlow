@@ -14,7 +14,15 @@ try {
   const service = new AntigravityLoginService({
     spawn: spawnAntigravityTerminal,
     probe: options => subscriptions.isAntigravityAuthenticated(options.command, options.env),
-    openExternal: async url => { console.log('Official auth URL host:', new URL(url).host) }
+    openExternal: async url => {
+      const parsed = new URL(url)
+      const parameterCounts = [...new Set(parsed.searchParams.keys())]
+        .map(name => {
+          const values = parsed.searchParams.getAll(name)
+          return [name, values.length, new Set(values).size, values.map(value => value.length)] as const
+        })
+      console.log('Official auth URL shape:', JSON.stringify({ host: parsed.host, path: parsed.pathname, parameterCounts }))
+    }
   })
   try {
     await service.login(await subscriptions.localAntigravityLoginOptions(resolve(command)), progress => {

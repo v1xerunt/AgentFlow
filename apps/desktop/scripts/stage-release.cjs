@@ -21,7 +21,7 @@ const ptyTarget = join(stage, 'node_modules', 'node-pty')
 mkdirSync(ptyTarget, { recursive: true })
 for (const name of ['package.json', 'LICENSE', 'lib']) if (existsSync(join(ptyRoot, name))) cpSync(join(ptyRoot, name), join(ptyTarget, name), { recursive: true })
 cpSync(prebuild, join(ptyTarget, 'prebuilds', platform), { recursive: true, filter: path => !path.endsWith('.pdb') })
-if (process.platform !== 'win32') chmodSync(join(ptyTarget, 'prebuilds', platform, 'spawn-helper'), 0o755)
+if (process.platform === 'darwin') chmodSync(join(ptyTarget, 'prebuilds', platform, 'spawn-helper'), 0o755)
 const addonRoot = dirname(require.resolve('node-addon-api/package.json', { paths: [ptyRoot] }))
 cpSync(addonRoot, join(stage, 'node_modules', 'node-addon-api'), { recursive: true })
 writeFileSync(join(stage, 'package.json'), JSON.stringify({

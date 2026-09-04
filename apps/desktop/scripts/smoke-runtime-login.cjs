@@ -84,6 +84,7 @@ async function run() {
     })()`)
     const state = await runUi(`
       (await waitFor(()=>document.querySelector('.sidebar-settings'))).click();
+      (await waitFor(()=>[...document.querySelectorAll('.settings-navigation button')].find(button=>button.querySelector('strong')?.textContent==='订阅账户'))).click();
       (await waitFor(()=>findButton(document.querySelector('.settings-surface'), '登录账户'))).click();
       const dialog = await waitFor(()=>document.querySelector('.runtime-login-dialog[open]'));
       const input = dialog.querySelector('input');
@@ -128,8 +129,8 @@ async function run() {
       return { title:dialog.querySelector('h2').textContent, placeholder:input.placeholder, notice:dialog.querySelector('.runtime-login-notice').textContent, overflow:dialog.scrollWidth>dialog.clientWidth };
     `)
     assert.equal(claudeState.title, '登录 Claude')
-    assert.equal(claudeState.placeholder, '粘贴 Claude 页面显示的授权码')
-    assert.match(claudeState.notice, /默认设置/)
+    assert.equal(claudeState.placeholder, '粘贴 Claude Code 页面显示的授权码')
+    assert.match(claudeState.notice, /官方 Claude Code 运行时/)
     assert.equal(claudeState.overflow, false)
     await new Promise(resolve => { window.webContents.once('paint', resolve); window.webContents.invalidate() })
     await new Promise(resolve => setTimeout(resolve, 500))

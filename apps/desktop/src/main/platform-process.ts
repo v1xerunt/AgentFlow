@@ -7,6 +7,8 @@ import { t } from '@agentflow/core/localization'
 
 const children = new Set<ChildProcess>()
 const terminating = new WeakSet<ChildProcess>()
+const terminatingUnixGroups = new Set<number>()
+const terminationTimers = new WeakMap<ChildProcess, ReturnType<typeof setTimeout>[]>()
 
 // Finder and Linux desktop launchers often inherit a much smaller PATH than terminals.
 export function runtimeEnvironment(source: NodeJS.ProcessEnv = process.env, platform = process.platform): NodeJS.ProcessEnv {
@@ -33,7 +35,10 @@ export function spawnManaged(command: string, args: string[], options: { cwd: st
   const launch = resolveCommandLaunch(command, args)
   const child = spawn(launch.command, launch.args, { ...options, env, windowsHide: true, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] }) as ChildProcessWithoutNullStreams
   children.add(child)
-  child.once('close', () => children.delete(child))
+  child.once('close', () => {
+    children.delete(child)
+    if (process.platform !== 'win32') setImmediate(() => clearFinishedUnixTermination(child))
+  })
   child.once('error', () => { if (!child.pid) children.delete(child) })
   // Tools may close stdin before the prompt has finished writing (e.g. an auth error).
   child.stdin.on('error', () => {})
@@ -55,8 +60,15 @@ export function resolveCommandLaunch(command: string, args: string[]) {
   return { command, args }
 }
 
-export function terminateProcessTree(child: ChildProcess) {
+export function terminateProcessTree(child: ChildProcess, force = false) {
   if (!child.pid) { child.kill(); return }
+  if (force && process.platform !== 'win32') {
+    for (const timer of terminationTimers.get(child) ?? []) clearTimeout(timer)
+    terminationTimers.delete(child)
+    terminatingUnixGroups.delete(child.pid)
+    signalUnixProcessGroup(child.pid, child, 'SIGKILL')
+    return
+  }
   if (terminating.has(child)) return
   terminating.add(child)
   if (process.platform === 'win32') {
@@ -65,14 +77,47 @@ export function terminateProcessTree(child: ChildProcess) {
     killer.once('error', () => child.kill())
     killer.once('exit', code => { if (code) child.kill() })
   } else {
-    // All managed Unix commands lead a process group; kill the group even if its leader exited.
-    try { process.kill(-child.pid, 'SIGKILL') }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') child.kill('SIGKILL') }
+    // Give Agent CLIs a chance to finish their current turn and persist session state.
+    // Escalation still targets the whole process group, including descendants whose leader exited.
+    const pid = child.pid
+    terminatingUnixGroups.add(pid)
+    signalUnixProcessGroup(pid, child, 'SIGINT')
+    const timers = [
+      setTimeout(() => signalUnixProcessGroup(pid, child, 'SIGTERM'), 1000),
+      setTimeout(() => {
+        signalUnixProcessGroup(pid, child, 'SIGKILL')
+        terminatingUnixGroups.delete(pid)
+        terminationTimers.delete(child)
+      }, 3000)
+    ]
+    terminationTimers.set(child, timers)
   }
 }
 
 export function terminateManagedProcesses() {
-  for (const child of children) terminateProcessTree(child)
+  for (const child of children) terminateProcessTree(child, true)
+  if (process.platform !== 'win32') {
+    for (const pid of terminatingUnixGroups) signalUnixProcessGroup(pid, undefined, 'SIGKILL')
+    terminatingUnixGroups.clear()
+  }
+}
+
+function signalUnixProcessGroup(pid: number, child: ChildProcess | undefined, signal: NodeJS.Signals) {
+  try { process.kill(-pid, signal) }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') child?.kill(signal)
+  }
+}
+
+function clearFinishedUnixTermination(child: ChildProcess) {
+  if (!child.pid || !terminatingUnixGroups.has(child.pid)) return
+  try { process.kill(-child.pid, 0) }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') return
+    for (const timer of terminationTimers.get(child) ?? []) clearTimeout(timer)
+    terminationTimers.delete(child)
+    terminatingUnixGroups.delete(child.pid)
+  }
 }
 
 export async function initializeRuntimeEnvironment() {
@@ -102,14 +147,18 @@ export async function initializeRuntimeEnvironment() {
   process.env.PATH = env.PATH
 }
 
-export function terminalCommand(command: string, source: NodeJS.ProcessEnv) {
+export function terminalCommand(command: string, source: NodeJS.ProcessEnv, args: string[] = []) {
   const env = runtimeEnvironment(source)
-  const launch = resolveCommandLaunch(command, [])
+  const launch = resolveCommandLaunch(command, args)
   if (launch.command !== command) return { ...launch, env }
   if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(command)) {
+    if (args.some(arg => !/^[A-Za-z0-9._-]+$/.test(arg))) {
+      throw new Error(t('This batch launcher cannot preserve these arguments. Configure its executable or Node entry point directly.'))
+    }
     // Expansion from an environment variable preserves spaces and metacharacters in the path.
     env.AGENTFLOW_TERMINAL_COMMAND = command
-    return { command: env.ComSpec || join(env.SystemRoot || 'C:\\Windows', 'System32', 'cmd.exe'), args: '/d /v:off /s /c ""%AGENTFLOW_TERMINAL_COMMAND%""', env }
+    const suffix = args.length ? ` ${args.join(' ')}` : ''
+    return { command: env.ComSpec || join(env.SystemRoot || 'C:\\Windows', 'System32', 'cmd.exe'), args: `/d /v:off /s /c ""%AGENTFLOW_TERMINAL_COMMAND%"${suffix}"`, env }
   }
-  return { command, args: [] as string[], env }
+  return { command, args, env }
 }

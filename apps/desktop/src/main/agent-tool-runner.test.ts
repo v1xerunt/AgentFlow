@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, delimiter, dirname, join } from 'node:path'
-import { agentToolExitErrorMessage, claudeConfigCapabilities, claudeReasoningEffortsForModel, detectAgentTool, invokeAgentTool, invokeAgentToolWithRefresh, parseKimiConfigCapabilities, parseStructuredLine } from './agent-tool-runner'
+import { agentToolExitErrorMessage, claudeConfigCapabilities, claudeReasoningEffortsForModel, detectAgentTool, invokeAgentTool, invokeAgentToolWithRefresh, loadKimiAcpSdk, macCodexDesktopCandidates, parseKimiConfigCapabilities, parseStructuredLine } from './agent-tool-runner'
 
 afterEach(() => vi.unstubAllEnvs())
 
 describe('managed runtime exclusion', () => {
+  it('checks both system and user ChatGPT app bundles for Codex on macOS', () => {
+    expect(macCodexDesktopCandidates('/Users/test')).toEqual([
+      '/Applications/ChatGPT.app/Contents/Resources/codex',
+      '/Users/test/Applications/ChatGPT.app/Contents/Resources/codex'
+    ])
+  })
+
   it('excludes an explicit managed executable, including directory aliases', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'agentflow-runtime-alias-'))
     try {
@@ -19,10 +26,16 @@ describe('managed runtime exclusion', () => {
   })
 
   it('resolves PATH commands before excluding managed runtimes', async () => {
-    vi.stubEnv('PATH', dirname(process.execPath))
-    const command = basename(process.execPath)
-    expect(await detectAgentTool({ id: 'test', name: 'Test', command })).toMatchObject({ installed: true, resolvedCommand: process.execPath })
-    expect(await detectAgentTool({ id: 'test', name: 'Test', command }, [process.execPath])).toEqual({ installed: false })
+    const directory = await mkdtemp(join(tmpdir(), 'agentflow-managed-runtime-'))
+    try {
+      const command = `agentflow-test-runtime${process.platform === 'win32' ? '.exe' : ''}`
+      const executable = join(directory, command)
+      await copyFile(process.execPath, executable)
+      if (process.platform !== 'win32') await chmod(executable, 0o755)
+      vi.stubEnv('PATH', directory)
+      expect(await detectAgentTool({ id: 'test', name: 'Test', command })).toMatchObject({ installed: true, resolvedCommand: await realpath(executable) })
+      expect(await detectAgentTool({ id: 'test', name: 'Test', command }, [executable])).toEqual({ installed: false })
+    } finally { await rm(directory, { recursive: true, force: true }) }
   })
 
   it('keeps an independent local installation when the first PATH candidate is managed', async () => {
@@ -32,7 +45,7 @@ describe('managed runtime exclusion', () => {
       await copyFile(process.execPath, independent)
       if (process.platform !== 'win32') await chmod(independent, 0o755)
       vi.stubEnv('PATH', `${dirname(process.execPath)}${delimiter}${directory}`)
-      expect(await detectAgentTool({ id: 'test', name: 'Test', command: basename(process.execPath) }, [process.execPath])).toMatchObject({ installed: true, resolvedCommand: independent })
+      expect(await detectAgentTool({ id: 'test', name: 'Test', command: basename(process.execPath) }, [process.execPath])).toMatchObject({ installed: true, resolvedCommand: await realpath(independent) })
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
 
@@ -48,7 +61,7 @@ describe('managed runtime exclusion', () => {
       vi.stubEnv('USERPROFILE', directory)
       vi.stubEnv('HOME', directory)
       const tool = { id: 'agent-tool:antigravity', name: 'Antigravity', command: 'agy' }
-      expect(await detectAgentTool(tool)).toMatchObject({ installed: true, resolvedCommand: command })
+      expect(await detectAgentTool(tool)).toMatchObject({ installed: true, resolvedCommand: await realpath(command) })
       expect(await detectAgentTool(tool, [command.toUpperCase()])).toEqual({ installed: false })
     } finally { await rm(directory, { recursive: true, force: true }) }
   })
@@ -118,6 +131,40 @@ support_efforts = ["low"]
       { providerId: 'test', model: 'default', prompt: 'test', workspacePath: process.cwd() }, () => undefined, AbortSignal.abort()))
       .rejects.toMatchObject({ name: 'AbortError' })
   })
+
+  it('checks cancellation again after the first ACP module load', async () => {
+    const controller = new AbortController()
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const loading = loadKimiAcpSdk('agent-tool:kimi-code', 'Kimi Code', controller.signal, async () => {
+      await gate
+      return import('@agentclientprotocol/sdk')
+    })
+    controller.abort()
+    release()
+    await expect(loading).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('turns ACP module loading failures into provider diagnostics', async () => {
+    await expect(loadKimiAcpSdk('agent-tool:kimi-code', 'Kimi Code', undefined, async () => { throw new Error('ACP chunk missing') }))
+      .rejects.toThrow('Kimi Code 退出码 1：ACP chunk missing')
+  })
+
+  it('streams a large Antigravity prompt through stdin instead of argv', async () => {
+    const prompt = '中'.repeat(500_000)
+    const script = `let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>input+=chunk);process.stdin.on('end',()=>{const event=JSON.parse(input);process.stdout.write(JSON.stringify({event:'result',result:{conversation_id:'large-input',response:String(Buffer.byteLength(event.message.content))}})+'\\n')})`
+    const result = await invokeAgentTool({ id: 'test', name: 'Antigravity', command: process.execPath, enabled: true, args: ['-e', script], resumeArgs: [] },
+      { providerId: 'agent-tool:antigravity', model: 'default', prompt, workspacePath: process.cwd() }, () => undefined)
+    expect(result).toMatchObject({ content: '1500000', externalSessionId: 'large-input' })
+  })
+
+  it('streams a large Kimi prompt through ACP instead of argv', async () => {
+    const prompt = '中'.repeat(500_000)
+    const script = `(async()=>{const acp=await import('@agentclientprotocol/sdk');const {Readable,Writable}=require('node:stream');const app=acp.agent({name:'fake-kimi'}).onRequest(acp.methods.agent.initialize,()=>({protocolVersion:acp.PROTOCOL_VERSION,agentCapabilities:{loadSession:true,sessionCapabilities:{resume:{}}},authMethods:[]})).onRequest(acp.methods.agent.session.new,()=>({sessionId:'kimi-large',modes:{currentModeId:'default',availableModes:[{id:'default',name:'Default'},{id:'auto',name:'Auto'}]}})).onRequest(acp.methods.agent.session.resume,()=>({modes:{currentModeId:'default',availableModes:[{id:'default',name:'Default'},{id:'auto',name:'Auto'}]}})).onRequest(acp.methods.agent.session.setMode,()=>({})).onRequest(acp.methods.agent.session.prompt,async({params,client})=>{const text=params.prompt[0].text;await client.notify(acp.methods.client.session.update,{sessionId:params.sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:String(Buffer.byteLength(text))}}});return{stopReason:'end_turn'}});globalThis.agentflowAcpConnection=app.connect(acp.ndJsonStream(Writable.toWeb(process.stdout),Readable.toWeb(process.stdin)))})()`
+    const result = await invokeAgentTool({ id: 'test', name: 'Kimi Code', command: process.execPath, enabled: true, args: ['-e', script], resumeArgs: ['-e', script] },
+      { providerId: 'agent-tool:kimi-code', model: 'default', prompt, workspacePath: process.cwd() }, () => undefined)
+    expect(result).toMatchObject({ content: '1500000', externalSessionId: 'kimi-large' })
+  }, 15_000)
 
   it('turns local Agent authentication failures into actionable login guidance', () => {
     expect(agentToolExitErrorMessage('agent-tool:codex', 'Codex', 1, '', 'Not logged in. Please run codex login.'))

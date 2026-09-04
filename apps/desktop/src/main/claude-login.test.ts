@@ -2,12 +2,14 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ClaudeLoginService, claudeAuthUrl, readClaudeSubscriptionAccount } from './claude-login'
+import { ClaudeLoginService, claudeAuthUrl, claudeLoginFailure, readClaudeSubscriptionAccount } from './claude-login'
+import type { ClaudeLoginOptions } from './claude-login'
 import type { LoginTerminal } from './antigravity-login'
 import type { RuntimeLoginProgress } from '../shared/llm'
 
-const options = { command: '/runtime/claude', cwd: '/runtime/login-workspace', env: { CLAUDE_CONFIG_DIR: '/runtime/profile' } }
+const options: ClaudeLoginOptions = { command: '/runtime/claude', cwd: '/runtime/login-workspace', env: { CLAUDE_CONFIG_DIR: '/runtime/profile' } }
 const url = 'https://claude.ai/oauth/authorize?client_id=test&state=state&code_challenge=challenge'
+const currentUrl = 'https://claude.com/cai/oauth/authorize?code=true&client_id=test&state=state&code_challenge=challenge'
 const trust = 'Do you trust the files in this folder?\nD:\\ExampleProject\n❯ 1. Yes, proceed\n2. No, exit\nEnter to confirm · Esc to exit'
 const theme = 'Choose the text style that looks best with your terminal\n> 1. Dark mode\n2. Light mode'
 const method = 'Select login method:\n> 1. Claude account with subscription · Pro, Max, Team, or Enterprise\n2. Anthropic Console account · API usage billing'
@@ -16,7 +18,7 @@ const security = 'Security notes:\nClaude can make mistakes\nPress Enter to cont
 const ready = 'Claude Code v2.0.25\nSonnet 4.5 · Claude Pro\n? for shortcuts'
 afterEach(() => vi.useRealTimers())
 
-function harness() {
+function harness(loginOptions = options) {
   vi.useFakeTimers()
   const data = new Set<(text: string) => void>()
   const exits = new Set<(event: { exitCode: number }) => void>()
@@ -28,7 +30,7 @@ function harness() {
   const dependencies = { spawn: vi.fn(async () => terminal), probe: vi.fn(async () => false) }
   const service = new ClaudeLoginService(dependencies)
   const progress: RuntimeLoginProgress[] = []
-  const result = service.login(options, update => progress.push(update))
+  const result = service.login(loginOptions, update => progress.push(update))
   void result.catch(() => {})
   const emit = async (text: string) => {
     await vi.advanceTimersByTimeAsync(0)
@@ -39,6 +41,41 @@ function harness() {
 }
 
 describe('Claude default login initialization', () => {
+  it('uses the dedicated auth flow without waiting for the main Claude interface', async () => {
+    const h = harness({ ...options, mode: 'auth-command' })
+    await h.emit(`${url}\nOpening browser…`)
+    expect(h.progress.at(-1)).toMatchObject({ phase: 'starting', authUrl: url, message: expect.stringContaining('浏览器') })
+    expect(h.terminal.write).not.toHaveBeenCalled()
+    h.dependencies.probe.mockResolvedValue(true)
+    h.exits.forEach(listener => listener({ exitCode: 0 }))
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(h.result).resolves.toBeUndefined()
+    expect(h.progress.at(-1)).toMatchObject({ phase: 'connected' })
+    expect(h.dependencies.probe).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('submits a plain authorization code to the dedicated auth command', async () => {
+    const h = harness({ ...options, mode: 'auth-command' })
+    await h.emit(`${currentUrl}\nPaste code here if prompted >`)
+    h.service.submit(h.progress[0]!.requestId, 'code#state')
+    expect(h.terminal.write).toHaveBeenLastCalledWith('code#state')
+    await vi.advanceTimersByTimeAsync(150)
+    expect(h.terminal.write).toHaveBeenLastCalledWith('\r')
+    h.dependencies.probe.mockResolvedValue(true)
+    h.exits.forEach(listener => listener({ exitCode: 0 }))
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(h.result).resolves.toBeUndefined()
+  })
+
+  it('reports official runtime connectivity failures immediately', async () => {
+    const h = harness({ ...options, mode: 'auth-command' })
+    await h.emit('Unable to connect to Anthropic services\nFailed to connect to api.anthropic.com: ENOTFOUND')
+    await expect(h.result).rejects.toThrow('无法连接 Anthropic 服务')
+    expect(h.progress.at(-1)).toMatchObject({ phase: 'error' })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it.each(['before-login', 'after-login'])('handles trust %s and completes all defaults before reporting connected', async order => {
     const h = harness()
     if (order === 'before-login') await h.emit(trust)
@@ -138,12 +175,12 @@ describe('Claude default login initialization', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('allows time for the browser while bounding the whole session', async () => {
+  it('allows three minutes for browser and email verification while bounding the whole session', async () => {
     const h = harness()
     await h.emit(`${url}\nPaste code here if prompted >`)
-    await vi.advanceTimersByTimeAsync(65_000)
+    await vi.advanceTimersByTimeAsync(2 * 60_000)
     expect(h.progress.at(-1)?.phase).toBe('awaiting-code')
-    await vi.advanceTimersByTimeAsync(535_000)
+    await vi.advanceTimersByTimeAsync(60_000)
     await expect(h.result).rejects.toThrow('登录超时')
     expect(vi.getTimerCount()).toBe(0)
   })
@@ -163,11 +200,27 @@ describe('Claude default login initialization', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it('reports startup failures without assuming Git Bash on every platform', async () => {
+    const service = new ClaudeLoginService({ spawn: async () => { throw new Error('shell unavailable') }, probe: async () => false })
+    const progress: RuntimeLoginProgress[] = []
+    await expect(service.login(options, update => progress.push(update))).rejects.toThrow('命令行环境')
+    expect(progress.at(-1)).toMatchObject({ phase: 'error', message: expect.not.stringContaining('Git Bash') })
+  })
+
   it('recognizes only complete official authorization URLs', () => {
     expect(claudeAuthUrl(url)).toBeUndefined()
     expect(claudeAuthUrl(`${url}\nPaste code here`)).toBe(url)
     expect(claudeAuthUrl(`\x1b]8;;${url}\x1b\\Sign in\x1b]8;;\x1b\\`)).toBe(url)
+    expect(claudeAuthUrl(`${currentUrl}\nPaste code here if prompted`)).toBe(currentUrl)
+    expect(claudeAuthUrl(`\x1b]8;;${currentUrl}\x1b\\${currentUrl}\x1b]8;;\x1b\\\nPaste code here`)).toBe(currentUrl)
+    expect(claudeAuthUrl(`${currentUrl.replace('/cai/oauth/authorize', '/account')}\n`)).toBeUndefined()
     expect(claudeAuthUrl(`${url.replace('claude.ai', 'evil.test')}\n`)).toBeUndefined()
+  })
+
+  it('redacts runtime failure details into actionable categories', () => {
+    expect(claudeLoginFailure('Failed to connect to api.anthropic.com: ENOTFOUND secret')).toContain('无法连接 Anthropic 服务')
+    expect(claudeLoginFailure('Login failed: Failed to start OAuth callback server: Is port 1234 in use?')).toContain('本地登录回调')
+    expect(claudeLoginFailure('unrelated terminal output')).toBeUndefined()
   })
 })
 

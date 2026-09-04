@@ -1,4 +1,4 @@
-// Opt-in real-runtime check. Stops at account selection before browser authorization.
+// Opt-in real-runtime check. Stops when the official authorization page is ready.
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -14,6 +14,22 @@ for (const initialized of [false, true]) {
     const options = await subscriptions.claudeLoginOptions(resolve(command))
     options.env.DISABLE_TELEMETRY = '1'
     options.env.DISABLE_ERROR_REPORTING = '1'
+    if (options.mode === 'auth-command') {
+      let reachedAuthorization = false
+      const service = new ClaudeLoginService({ spawn: spawnClaudeTerminal, probe: async () => false })
+      try {
+        await service.login(options, progress => {
+          if (!progress.authUrl) return
+          reachedAuthorization = true
+          service.cancel(progress.requestId)
+        })
+      } catch (error) {
+        if (!reachedAuthorization) throw error
+      }
+      if (!reachedAuthorization) throw new Error('Expected the official Claude authorization page.')
+      console.log(JSON.stringify({ fixture: 'auth-command', stoppedBeforeAuthorization: true }))
+      break
+    }
     if (initialized) await writeFile(join(options.env.CLAUDE_CONFIG_DIR!, '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true, theme: 'dark', autoUpdates: false }))
     let reachedAccountSelection = false
     let handledTrust = false
