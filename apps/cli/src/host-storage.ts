@@ -29,6 +29,10 @@ async function directoryTree(path: string, create = false) {
   let current = parse(absolute).root
   for (const segment of absolute.slice(current.length).split(sep).filter(Boolean)) {
     current = join(current, segment)
+    // macOS exposes these system directories through links into /private.
+    // Only accept their expected system destinations; other links stay rejected.
+    if (process.platform === 'darwin' && ['/var', '/tmp', '/etc'].includes(current) &&
+        await realpath(current) === `/private${current}`) current = `/private${current}`
     if (create) await mkdir(current).catch(error => { if (error.code !== 'EEXIST') throw error })
     await ordinaryPath(current, true)
   }

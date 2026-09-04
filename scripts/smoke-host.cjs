@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict')
-const { mkdtempSync, cpSync, writeFileSync, readFileSync, existsSync, rmSync, mkdirSync } = require('node:fs')
+const { mkdtempSync, cpSync, writeFileSync, readFileSync, existsSync, rmSync, mkdirSync, symlinkSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { basename, dirname, join, resolve } = require('node:path')
 const { spawnSync } = require('node:child_process')
@@ -20,6 +20,11 @@ try {
     return JSON.parse(result.stdout)
   }
   assert.equal(call(['host', 'validate', graph]).valid, true)
+  const linkedTarget = join(root, 'linked-target')
+  mkdirSync(linkedTarget)
+  symlinkSync(linkedTarget, join(root, 'linked-parent'), process.platform === 'win32' ? 'junction' : 'dir')
+  assert.match(call(['host', 'start', graph, '--workspace', root, '--run-dir', join(root, 'linked-parent', 'run')], true), /ordinary directory/)
+  assert.equal(existsSync(join(linkedTarget, 'run')), false)
   const runDir = join(root, '流程 with spaces')
   let state = call(['host', 'start', graph, '--workspace', root, '--run-dir', runDir])
   assert.deepEqual(state.ready, ['writer'])

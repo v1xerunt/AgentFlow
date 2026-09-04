@@ -1,4 +1,4 @@
-import { cp, lstat, mkdir, access } from 'node:fs/promises'
+import { cp, lstat, mkdir, access, readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -23,7 +23,9 @@ if (values.help) {
     for (const target of targets) {
       await mkdir(dirname(target), { recursive: true })
       await mkdir(target)
-      await cp(source, target, { recursive: true, force: false, errorOnExist: true })
+      for (const name of await readdir(source)) {
+        await cp(join(source, name), join(target, name), { recursive: true, force: false, errorOnExist: true })
+      }
       console.log(`Installed: ${target}`)
     }
   } catch (error) { console.error(error.message); process.exitCode = 1 }
