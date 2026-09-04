@@ -9,7 +9,13 @@ const executable = process.argv[2] ? resolve(process.argv[2]) : resolve(__dirnam
 const env = { ...process.env, AGENTFLOW_RELEASE_SMOKE: root }
 delete env.ELECTRON_RUN_AS_NODE
 delete env.ELECTRON_RENDERER_URL
-const child = spawn(executable, [], { env, stdio: 'inherit', windowsHide: true, timeout: 45_000 })
+const launch = process.platform === 'darwin'
+  ? {
+      command: 'open',
+      args: ['-n', '-W', resolve(executable, '../../..'), '--args', `--agentflow-release-smoke=${root}`]
+    }
+  : { command: executable, args: [] }
+const child = spawn(launch.command, launch.args, { env, stdio: 'inherit', windowsHide: true, timeout: 45_000 })
 child.once('error', error => { console.error(error); process.exitCode = 1 })
 child.once('close', code => {
   try {

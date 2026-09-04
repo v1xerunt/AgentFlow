@@ -12,7 +12,10 @@ const browser = vi.hoisted(() => ({
   scripts: [] as string[],
   clearStorageData: vi.fn(async () => undefined),
   clearCache: vi.fn(async () => undefined),
-  partitions: [] as string[]
+  partitions: [] as string[],
+  defaultUserAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) AgentFlow/0.1.0 Chrome/142.0.0.0 Electron/44.1.0 Safari/537.36',
+  sessionUserAgent: '',
+  setUserAgent: vi.fn<(userAgent: string) => void>()
 }))
 
 vi.mock('electron', async () => {
@@ -20,7 +23,7 @@ vi.mock('electron', async () => {
   class WebContents extends EventEmitter {
     url = ''
     getURL() { return this.url }
-    getUserAgent() { return 'test-agent' }
+    getUserAgent() { return browser.sessionUserAgent }
     setWindowOpenHandler(_handler: unknown) {}
     async executeJavaScript(script: string) {
       browser.scripts.push(script)
@@ -50,6 +53,8 @@ vi.mock('electron', async () => {
           clearStorageData: browser.clearStorageData,
           clearCache: browser.clearCache,
           on() {},
+          getUserAgent: () => browser.defaultUserAgent,
+          setUserAgent(userAgent: string) { browser.sessionUserAgent = userAgent; browser.setUserAgent(userAgent) },
           setPermissionRequestHandler() {},
           setPermissionCheckHandler() {}
         }
@@ -70,6 +75,7 @@ beforeEach(() => {
   browser.cookies = [{ name: 'ds_session_id', value: 'test-cookie' }]
   browser.probeResult = true
   browser.probeError = undefined
+  browser.sessionUserAgent = browser.defaultUserAgent
   vi.clearAllMocks()
 })
 
@@ -123,6 +129,8 @@ describe('DeepSeek Web browser bridge', () => {
     const report = vi.fn()
     await expect(value.connect(report)).resolves.toEqual({ connected: true })
     expect(browser.windows[0].options).toMatchObject({ show: true, webPreferences: { partition: 'persist:agentflow-deepseek-web', sandbox: true, nodeIntegration: false, contextIsolation: true } })
+    expect(browser.setUserAgent).toHaveBeenCalledOnce()
+    expect(browser.sessionUserAgent).toBe('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36')
     expect(browser.windows[0].isDestroyed()).toBe(true)
     expect(report).toHaveBeenCalledWith(expect.objectContaining({ phase: 'login' }))
     expect(new Set(browser.partitions)).toEqual(new Set(['persist:agentflow-deepseek-web']))
@@ -146,6 +154,7 @@ describe('DeepSeek Web browser bridge', () => {
     const result = await value.invoke(request, delta)
     expect(result).toMatchObject({ content: 'answer!', externalSessionId: 'test-session', parts: [{ type: 'reasoning', text: 'reason' }, { type: 'output_text', text: 'answer!' }] })
     expect(delta.mock.calls.flat()).toEqual(['answer', '!'])
+    expect(fetcher).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ headers: expect.objectContaining({ 'user-agent': browser.sessionUserAgent }) }))
     const saved = await readFile(join(directory, 'subscription-connectors', 'deepseek-web', 'sessions.json'), 'utf8')
     expect(saved).toContain('historyHash')
     for (const secret of ['test-token', 'test-cookie', 'hello', 'answer!']) expect(saved).not.toContain(secret)

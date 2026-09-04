@@ -11,7 +11,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0-only"></a>
 </div>
 
-AgentFlow, also known as **传声筒**, brings model APIs and local coding agents together in a desktop workspace. Build a workflow on the canvas, ask one Agent to review another's work, and collect the results in your own project folders.
+AgentFlow brings model APIs and local coding agents together in a desktop workspace. Build a workflow on the canvas, ask one Agent to review another's work, and collect the results in your own project folders.
 
 ![AgentFlow canvas with a customer-feedback workflow](docs/assets/screenshots/flow-en.png)
 

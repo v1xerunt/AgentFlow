@@ -15,7 +15,7 @@ import type {
 } from '../shared/llm'
 import { detectAgentTool, type AgentToolRuntimeConfiguration } from './agent-tool-runner'
 import { DeepSeekWebAuthenticationError } from './deepseek-web-protocol'
-import { readClaudeSubscriptionAccount, type ClaudeAccount } from './claude-login'
+import { readClaudeSubscriptionAccount, type ClaudeAccount, type ClaudeLoginOptions } from './claude-login'
 import { spawnManaged, terminateProcessTree } from './platform-process'
 import { isWithinDirectory, resolveWorkspaceTarget } from './workspace-paths'
 import { atomicWriteFile } from './atomic-file'
@@ -70,7 +70,7 @@ export interface SubscriptionConnectorDependencies {
   runProcess(command: string, args: string[], options: ProcessOptions): Promise<ProcessResult>
   spawnProcess(command: string, args: string[], options: ProcessOptions): ChildProcessWithoutNullStreams
   loginAntigravity?(command: string, options: ProcessOptions, report: (progress: RuntimeLoginProgress) => void): Promise<void>
-  loginClaude?(command: string, options: ProcessOptions, report: (progress: RuntimeLoginProgress) => void): Promise<void>
+  loginClaude?(command: string, options: ClaudeLoginOptions, report: (progress: RuntimeLoginProgress) => void): Promise<void>
   now(): string
   deepSeekWeb?: SubscriptionWebBridge
 }
@@ -128,9 +128,7 @@ const PRESETS: ConnectorPreset[] = [
     systemToolId: 'agent-tool:antigravity',
     installer: {
       windows: 'https://antigravity.google/cli/install.ps1',
-      unix: 'https://antigravity.google/cli/install.sh',
-      windowsArgs: ['--skip-aliases', '--skip-path'],
-      unixArgs: ['--skip-aliases', '--skip-path']
+      unix: 'https://antigravity.google/cli/install.sh'
     }
   }
 ]
@@ -438,14 +436,18 @@ export class SubscriptionConnectorService {
     await writeFile(scriptPath, script, 'utf8')
     report({ connectorId: preset.id, phase: 'installing', message: t("Installing {0} in the background…", [preset.name]) })
     const environment = this.environment(preset.id)
+    const managedInstallDirectory = preset.id === 'subscription:antigravity' ? join(connectorRoot, 'bin') : undefined
+    const installerArgs = managedInstallDirectory
+      ? ['--dir', managedInstallDirectory]
+      : windows ? (preset.installer.windowsArgs ?? []) : (preset.installer.unixArgs ?? [])
     let command: string
     let args: string[]
     if (windows) {
       command = powershellCommand()
-      args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...(preset.installer.windowsArgs ?? [])]
+      args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...installerArgs]
     } else {
       command = '/bin/bash'
-      args = [scriptPath, ...(preset.installer.unixArgs ?? [])]
+      args = [scriptPath, ...installerArgs]
     }
     if (preset.id === 'subscription:codex') {
       const installDirectory = join(connectorRoot, 'bin')
@@ -566,7 +568,8 @@ export class SubscriptionConnectorService {
     const cwd = join(root, 'login-workspace')
     await mkdir(this.profileRoot(id), { recursive: true })
     await mkdir(cwd, { recursive: true })
-    return { command, cwd, env: this.environment(id, command) }
+    const mode = await this.supportsClaudeAuthCommands(command) ? 'auth-command' : 'interactive'
+    return { command, cwd, env: this.environment(id, command), mode } satisfies ClaudeLoginOptions
   }
 
   private supportsClaudeAuthCommands(command: string) {
@@ -770,7 +773,7 @@ function connectorPreset(id: SubscriptionConnectorId) {
   return preset
 }
 
-export function sanitizedSubscriptionEnvironment(connectorId: SubscriptionConnectorId, profileRoot: string, source: NodeJS.ProcessEnv) {
+export function sanitizedSubscriptionEnvironment(connectorId: SubscriptionConnectorId, profileRoot: string, source: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform) {
   const environment: NodeJS.ProcessEnv = {}
   for (const [key, value] of Object.entries(source)) {
     const normalized = key.toUpperCase()
@@ -783,12 +786,15 @@ export function sanitizedSubscriptionEnvironment(connectorId: SubscriptionConnec
     environment.CLAUDE_CONFIG_DIR = profileRoot
     environment.CLAUDE_CODE_AUTO_CONNECT_IDE = 'false'
     environment.DISABLE_AUTOUPDATER = '1'
+    if (source.CLAUDE_CODE_USE_POWERSHELL_TOOL === '0' || source.CLAUDE_CODE_USE_POWERSHELL_TOOL === '1') {
+      environment.CLAUDE_CODE_USE_POWERSHELL_TOOL = source.CLAUDE_CODE_USE_POWERSHELL_TOOL
+    }
     const configuredBash = source.CLAUDE_CODE_GIT_BASH_PATH
-    const shellPath = configuredBash && existsSync(configuredBash) ? resolve(configuredBash) : findKimiShell()
+    const shellPath = configuredBash && existsSync(configuredBash) ? resolve(configuredBash) : findKimiShell(platform, source)
     if (shellPath) environment.CLAUDE_CODE_GIT_BASH_PATH = shellPath
   } else if (connectorId === 'subscription:kimi-code') {
     environment.KIMI_CODE_HOME = profileRoot
-    const shellPath = findKimiShell()
+    const shellPath = findKimiShell(platform, source)
     if (shellPath) environment.KIMI_SHELL_PATH = shellPath
   }
   return environment
@@ -810,16 +816,15 @@ export function subscriptionRuntimeTemplates(connectorId: SubscriptionConnectorI
     return { args: base, resumeArgs: [...base, '--resume', '{session}'] }
   }
   if (connectorId === 'subscription:kimi-code') {
-    const selected = model ? ['-m', model] : []
     return {
-      args: [...selected, '-p', '{prompt}', '--output-format', 'stream-json'],
-      resumeArgs: [...selected, '-r', '{session}', '-p', '{prompt}', '--output-format', 'stream-json']
+      args: ['acp'],
+      resumeArgs: ['acp']
     }
   }
   const reasoningArgs = reasoning ? ['--effort', reasoning] : []
   return {
-    args: ['-p', '{prompt}', '--output-format', 'stream-json', '--sandbox', ...modelArgs, ...reasoningArgs],
-    resumeArgs: ['-p', '{prompt}', '--output-format', 'stream-json', '--sandbox', '--conversation', '{session}', ...modelArgs, ...reasoningArgs]
+    args: ['--input-format', 'stream-json', '--output-format', 'stream-json', '--sandbox', ...modelArgs, ...reasoningArgs],
+    resumeArgs: ['--input-format', 'stream-json', '--output-format', 'stream-json', '--sandbox', '--conversation', '{session}', ...modelArgs, ...reasoningArgs]
   }
 }
 
@@ -832,17 +837,17 @@ export function authDetails(text: string) {
 function expectedCommands(id: SubscriptionConnectorId, connectorRoot: string) {
   const executable = (name: string) => process.platform === 'win32' ? `${name}.exe` : name
   if (id === 'subscription:codex') return [join(connectorRoot, 'bin', executable('codex'))]
-  if (id === 'subscription:antigravity' && process.platform === 'win32' && process.env.LOCALAPPDATA) return [join(process.env.LOCALAPPDATA, 'agy', 'bin', executable('agy'))]
+  if (id === 'subscription:antigravity') return [join(connectorRoot, 'bin', executable('agy'))]
   return [join(homedir(), '.local', 'bin', executable(id === 'subscription:claude-code' ? 'claude' : id === 'subscription:kimi-code' ? 'kimi' : 'agy'))]
 }
 
-function findKimiShell() {
-  if (process.platform !== 'win32') return undefined
+function findKimiShell(platform: NodeJS.Platform = process.platform, source: NodeJS.ProcessEnv = process.env) {
+  if (platform !== 'win32') return undefined
   const candidates = [
-    process.env.ProgramFiles ? join(process.env.ProgramFiles, 'Git', 'bin', 'bash.exe') : undefined,
-    process.env.ProgramFiles ? join(process.env.ProgramFiles, 'Git', 'usr', 'bin', 'bash.exe') : undefined,
-    process.env['ProgramFiles(x86)'] ? join(process.env['ProgramFiles(x86)'], 'Git', 'bin', 'bash.exe') : undefined,
-    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'Git', 'bin', 'bash.exe') : undefined
+    source.ProgramFiles ? join(source.ProgramFiles, 'Git', 'bin', 'bash.exe') : undefined,
+    source.ProgramFiles ? join(source.ProgramFiles, 'Git', 'usr', 'bin', 'bash.exe') : undefined,
+    source['ProgramFiles(x86)'] ? join(source['ProgramFiles(x86)'], 'Git', 'bin', 'bash.exe') : undefined,
+    source.LOCALAPPDATA ? join(source.LOCALAPPDATA, 'Programs', 'Git', 'bin', 'bash.exe') : undefined
   ]
   return candidates.find((candidate): candidate is string => Boolean(candidate && existsSync(candidate)))
 }

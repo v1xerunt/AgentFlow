@@ -7,7 +7,12 @@ import type { RuntimeLoginProgress } from '../shared/llm'
 import type { LoginTerminal } from './antigravity-login'
 import { terminalCommand } from './platform-process'
 
-export interface ClaudeLoginOptions { command: string; cwd: string; env: NodeJS.ProcessEnv }
+export interface ClaudeLoginOptions {
+  command: string
+  cwd: string
+  env: NodeJS.ProcessEnv
+  mode?: 'auth-command' | 'interactive'
+}
 export interface ClaudeAccount { connected: boolean; accountLabel?: string; planType?: string }
 export interface ClaudeLoginDependencies {
   spawn(options: ClaudeLoginOptions): Promise<LoginTerminal>
@@ -43,6 +48,17 @@ export function claudeAuthUrl(raw: string) {
   })
 }
 
+export function claudeLoginFailure(raw: string) {
+  const text = stripVTControlCharacters(raw)
+  if (/Unable to connect to Anthropic services|Failed to connect to (?:api\.)?anthropic\.com|\b(?:ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT)\b/i.test(text)) {
+    return t("Claude could not reach Anthropic services. Check your network, proxy, DNS, and supported region, then reconnect.")
+  }
+  if (/Failed to start OAuth callback server|Is port \d+ in use\?/i.test(text)) {
+    return t("Claude could not start its local login callback. Close other Claude login attempts and reconnect.")
+  }
+  return undefined
+}
+
 export class ClaudeLoginService {
   private active?: { id: string; submit(value: string): void; cancel(): void }
 
@@ -71,6 +87,7 @@ export class ClaudeLoginService {
       let mainReady = false
       let polling = false
       let loginRequested = false
+      const directAuth = options.mode === 'auth-command'
       let scheduled = false
       let lastPhase: RuntimeLoginProgress['phase'] = 'starting'
       const handled = new Set<string>()
@@ -78,6 +95,8 @@ export class ClaudeLoginService {
       const timers = new Set<ReturnType<typeof setTimeout>>()
       let stepTimeout: ReturnType<typeof setTimeout> | undefined
       let parseTimeout: ReturnType<typeof setTimeout> | undefined
+      let sessionTimeout: ReturnType<typeof setTimeout> | undefined
+      let authorizationWindowStarted = false
       const publish = (phase: RuntimeLoginProgress['phase'], message: string) => {
         lastPhase = phase
         report({ requestId: id, provider: 'claude', phase, message, authUrl })
@@ -85,7 +104,7 @@ export class ClaudeLoginService {
       const finish = (phase: 'connected' | 'cancelled' | 'error', message: string) => {
         if (settled) return
         settled = true
-        clearTimeout(timeout)
+        clearTimeout(sessionTimeout)
         clearTimeout(stepTimeout)
         clearTimeout(parseTimeout)
         clearInterval(pollTimer)
@@ -102,6 +121,10 @@ export class ClaudeLoginService {
       const armStepTimeout = () => {
         clearTimeout(stepTimeout)
         stepTimeout = setTimeout(() => finish('error', t("Claude initialization could not continue. A new confirmation may be required. Update the runtime and try again.")), 60_000)
+      }
+      const armSessionTimeout = (duration: number) => {
+        clearTimeout(sessionTimeout)
+        sessionTimeout = setTimeout(() => finish('error', t("Claude login timed out. Reconnect to continue.")), duration)
       }
       const later = (action: () => void, delay = 150) => {
         const timer = setTimeout(() => {
@@ -123,12 +146,13 @@ export class ClaudeLoginService {
         later(() => { terminal?.write('\r'); scheduled = false })
       }
       const verify = async () => {
-        if (settled || polling || !mainReady) return
+        if (settled || polling || (!directAuth && !mainReady)) return
         polling = true
         try {
           const connected = await this.dependencies.probe(options)
           if (settled) return
-          if (connected) finish('connected', t("Claude account connected and initialization complete."))
+          if (connected) finish('connected', directAuth ? t("Claude account connected.") : t("Claude account connected and initialization complete."))
+          else if (directAuth) return
           else if (!loginRequested && !handled.has('success') && !submitted) {
             loginRequested = true
             mainReady = false
@@ -145,6 +169,8 @@ export class ClaudeLoginService {
       const parse = () => {
         if (settled || scheduled) return
         const text = stripVTControlCharacters(buffer)
+        const failure = claudeLoginFailure(buffer)
+        if (failure) { finish('error', failure); return }
         if (submitted && /invalid_grant|invalid (?:authorization )?code|(?:authentication|token exchange) failed/i.test(text)) {
           finish('error', t("The Claude authorization code is invalid or expired. Reconnect to get a new code.")); return
         }
@@ -173,7 +199,17 @@ export class ClaudeLoginService {
           enter('security', t("Completing Claude safety information and initialization…")); return
         }
         const foundUrl = claudeAuthUrl(buffer)
-        if (foundUrl) authUrl = foundUrl
+        if (foundUrl) {
+          authUrl = foundUrl
+          if (!authorizationWindowStarted) {
+            authorizationWindowStarted = true
+            armSessionTimeout(3 * 60_000)
+          }
+          if (directAuth && !awaitingCode && !submitted) {
+            clearTimeout(stepTimeout)
+            publish('starting', t("Complete Claude subscription login in your browser. Email or organization verification can remain open for up to three minutes."))
+          }
+        }
         if (!submitted && /Paste (?:code|.*authorization code) here|Paste.*code.*(?:below|prompted)/i.test(text) && authUrl) {
           if (!awaitingCode) {
             awaitingCode = true
@@ -189,8 +225,8 @@ export class ClaudeLoginService {
           void verify()
         }
       }
-      const timeout = setTimeout(() => finish('error', t("Claude login timed out. Reconnect to continue.")), 10 * 60_000)
-      const pollTimer = setInterval(() => void verify(), 2_000)
+      armSessionTimeout(10 * 60_000)
+      const pollTimer = setInterval(() => { if (!directAuth) void verify() }, 2_000)
       this.active = {
         id,
         cancel: () => finish('cancelled', t("Claude login cancelled.")),
@@ -207,7 +243,7 @@ export class ClaudeLoginService {
           later(() => terminal?.write('\r'))
         }
       }
-      publish('starting', t("Preparing Claude login and initialization…"))
+      publish('starting', directAuth ? t("Preparing Claude subscription login…") : t("Preparing Claude login and initialization…"))
       if (settled) return
       armStepTimeout()
       void this.dependencies.spawn(options).then(spawned => {
@@ -220,18 +256,32 @@ export class ClaudeLoginService {
           clearTimeout(parseTimeout)
           parseTimeout = setTimeout(parse, 40)
         }))
-        listeners.push(terminal.onExit(() => {
-          if (!settled) finish('error', t("The Claude initialization process has exited. Reconnect to continue."))
+        listeners.push(terminal.onExit(({ exitCode }) => {
+          if (settled) return
+          const failure = claudeLoginFailure(buffer)
+          if (failure) { finish('error', failure); return }
+          if (directAuth && exitCode === 0) {
+            publish('verifying', t("Checking Claude subscription…"))
+            void verify().then(() => {
+              if (!settled) finish('error', t("Claude login finished without a valid subscription account. Reconnect to continue."))
+            })
+            return
+          }
+          finish('error', directAuth
+            ? t("The Claude login process exited before authentication completed. Reconnect to continue.")
+            : t("The Claude initialization process has exited. Reconnect to continue."))
         }))
-      }).catch(() => finish('error', t("Could not start Claude login. Check the runtime and Git Bash, then try again.")))
+      }).catch(() => finish('error', t("Could not start Claude login. Check the runtime and shell configuration, then try again.")))
     })
   }
 }
 
 export async function spawnClaudeTerminal(options: ClaudeLoginOptions): Promise<LoginTerminal> {
   const pty = await import('node-pty')
-  const launch = terminalCommand(options.command, options.env)
+  const args = options.mode === 'auth-command' ? ['auth', 'login', '--claudeai'] : []
+  const launch = terminalCommand(options.command, options.env, args)
   const env = Object.fromEntries(Object.entries(launch.env).filter((entry): entry is [string, string] => entry[1] !== undefined))
-  // A no-prompt interactive session completes both account login and onboarding.
+  // Current runtimes have a stable authentication command. Older versions fall
+  // back to one interactive session that completes login and onboarding.
   return pty.spawn(launch.command, launch.args, { cwd: options.cwd, env, name: 'xterm-256color', cols: 2000, rows: 40 })
 }

@@ -34,6 +34,10 @@ describe('platform processes', () => {
     expect(JSON.parse(stdout)).toEqual(args)
   })
 
+  it.runIf(process.platform !== 'win32')('passes explicit arguments to a terminal command', () => {
+    expect(terminalCommand('/runtime/claude', process.env, ['auth', 'login', '--claudeai']).args).toEqual(['auth', 'login', '--claudeai'])
+  })
+
   it.runIf(process.platform === 'win32')('runs npm-style cmd shims from a Unicode directory with spaces', async () => {
     const cwd = await directory()
     const script = join(cwd, 'echo.cjs')
@@ -75,4 +79,19 @@ describe('platform processes', () => {
       await expect.poll(() => { try { process.kill(pid, 0); return true } catch { return false } }, { timeout: 5000 }).toBe(false)
     } finally { terminateProcessTree(child) }
   }, 15_000)
+
+  it.runIf(process.platform !== 'win32')('lets Unix Agent tools handle SIGINT before escalation', async () => {
+    const cwd = await directory()
+    const readyFile = join(cwd, 'ready')
+    const signalFile = join(cwd, 'signal')
+    const source = `const fs=require('node:fs');process.on('SIGINT',()=>{fs.writeFileSync(process.argv[2],'SIGINT');process.exit(0)});fs.writeFileSync(process.argv[1],'ready');setInterval(()=>{},1000)`
+    const child = spawnManaged(process.execPath, ['-e', source, readyFile, signalFile], { cwd })
+    const closed = new Promise<void>((resolve, reject) => { child.once('error', reject); child.once('close', () => resolve()) })
+    try {
+      await expect.poll(() => readFile(readyFile, 'utf8').catch(() => ''), { timeout: 5000 }).toBe('ready')
+      terminateProcessTree(child)
+      await closed
+      await expect(readFile(signalFile, 'utf8')).resolves.toBe('SIGINT')
+    } finally { terminateProcessTree(child, true) }
+  })
 })

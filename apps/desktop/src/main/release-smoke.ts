@@ -6,6 +6,7 @@ import { terminateManagedProcesses } from './platform-process'
 
 export function initializeReleaseSmoke() {
   const path = process.env.AGENTFLOW_RELEASE_SMOKE
+    ?? process.argv.find((argument) => argument.startsWith('--agentflow-release-smoke='))?.slice('--agentflow-release-smoke='.length)
   if (!path) return undefined
   app.disableHardwareAcceleration()
   const root = resolve(path)
@@ -24,6 +25,8 @@ export async function runReleaseSmoke(root: string) {
   const timeout = setTimeout(() => finish({ error: 'Release smoke timed out' }, 1), 30_000)
   try {
     if (!app.isPackaged) throw new Error('Release smoke must run the packaged application')
+    const acp = await import('@agentclientprotocol/sdk')
+    if (typeof acp.client !== 'function' || typeof acp.ndJsonStream !== 'function') throw new Error('Packaged ACP client is unavailable')
     const window = BrowserWindow.getAllWindows()[0]!
     if (window.webContents.isLoading()) await new Promise<void>((resolve, reject) => {
       window.webContents.once('did-finish-load', () => resolve())
@@ -60,6 +63,6 @@ export async function runReleaseSmoke(root: string) {
       terminal.write('exit\r')
     })
     clearTimeout(timeout)
-    finish({ ok: true, ui, pty: true }, 0)
+    finish({ ok: true, ui, pty: true, acp: true }, 0)
   } catch (error) { clearTimeout(timeout); finish({ error: String(error) }, 1) }
 }

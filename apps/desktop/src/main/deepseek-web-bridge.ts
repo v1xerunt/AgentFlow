@@ -229,6 +229,7 @@ export class DeepSeekWebBridge implements SubscriptionWebBridge {
     browserSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
     browserSession.setPermissionCheckHandler(() => false)
     if (!this.profileConfigured) {
+      browserSession.setUserAgent(chromeUserAgent(browserSession.getUserAgent()))
       browserSession.on('will-download', (event) => event.preventDefault())
       this.profileConfigured = true
     }
@@ -331,6 +332,16 @@ function historyHash(messages: ModelMessage[]) {
 function isHttps(url: string) {
   try { return new URL(url).protocol === 'https:' }
   catch { return false }
+}
+
+/** Keep the host platform and bundled Chromium version while removing Electron/app product tokens. */
+export function chromeUserAgent(userAgent: string) {
+  const platform = userAgent.match(/^Mozilla\/5\.0 \([^)]+\)/)?.[0]
+  const appleWebKit = userAgent.match(/\bAppleWebKit\/[\d.]+/)?.[0]
+  const chrome = userAgent.match(/\bChrome\/[\d.]+/)?.[0]
+  const safari = userAgent.match(/\bSafari\/[\d.]+/)?.[0]
+  if (!platform || !appleWebKit || !chrome || !safari) return userAgent
+  return `${platform} ${appleWebKit} (KHTML, like Gecko) ${chrome} ${safari}`
 }
 
 function isDeepSeekPage(url: string) {

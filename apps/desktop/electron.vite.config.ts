@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin({
-      exclude: ['@agentflow/core', '@agentflow/schema', 'cross-spawn', 'zod', 'yaml']
+      exclude: ['@agentclientprotocol/sdk', '@agentflow/core', '@agentflow/schema', 'cross-spawn', 'zod', 'yaml']
     })]
   },
   preload: {

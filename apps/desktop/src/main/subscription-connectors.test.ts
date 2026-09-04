@@ -38,7 +38,7 @@ describe('subscription connectors', () => {
     await ready
     const restarted = new SubscriptionConnectorService(directory, dependencies)
     expect((await restarted.refresh()).find(item => item.id === 'subscription:claude-code')?.connected).toBe(false)
-    expect(dependencies.loginClaude).toHaveBeenCalledWith(process.execPath, expect.objectContaining({ cwd: join(directory, 'subscription-connectors', 'claude-code', 'login-workspace'), env: expect.objectContaining({ CLAUDE_CONFIG_DIR: join(directory, 'subscription-connectors', 'claude-code', 'profile') }) }), expect.any(Function))
+    expect(dependencies.loginClaude).toHaveBeenCalledWith(process.execPath, expect.objectContaining({ cwd: join(directory, 'subscription-connectors', 'claude-code', 'login-workspace'), env: expect.objectContaining({ CLAUDE_CONFIG_DIR: join(directory, 'subscription-connectors', 'claude-code', 'profile') }), mode: 'auth-command' }), expect.any(Function))
     complete()
     expect((await connection).find(item => item.id === 'subscription:claude-code')?.connected).toBe(true)
     const after = new SubscriptionConnectorService(directory, dependencies)
@@ -105,6 +105,29 @@ describe('subscription connectors', () => {
     expect((await service.snapshot()).find(item => item.id === 'subscription:antigravity')).toMatchObject({ installed: false, systemToolInstalled: true })
   })
 
+  it('installs Antigravity in its managed directory using only the supported dir option', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'agentflow-antigravity-install-'))
+    temporaryDirectories.push(directory)
+    const installDirectory = join(directory, 'subscription-connectors', 'antigravity', 'bin')
+    const binary = join(installDirectory, process.platform === 'win32' ? 'agy.exe' : 'agy')
+    await mkdir(installDirectory, { recursive: true })
+    await writeFile(binary, 'test executable')
+    const runProcess = vi.fn(async (_command: string, args: string[]) => ({ code: 0, stdout: args.includes('--version') ? '1.2.3' : '', stderr: '' }))
+    const dependencies = {
+      ...createSubscriptionConnectorDependencies(async () => {}),
+      fetchText: vi.fn(async () => '# official installer fixture'),
+      runProcess,
+      loginAntigravity: vi.fn(async () => undefined)
+    }
+    const service = new SubscriptionConnectorService(directory, dependencies)
+    const result = await service.connect('subscription:antigravity', () => {})
+    const installCall = runProcess.mock.calls.find(([, args]) => args.includes('--dir'))
+    expect(installCall?.[1].slice(-2)).toEqual(['--dir', installDirectory])
+    expect(installCall?.[1]).not.toContain('--skip-aliases')
+    expect(installCall?.[1]).not.toContain('--skip-path')
+    expect(result.find(item => item.id === 'subscription:antigravity')).toMatchObject({ installed: true, connected: true })
+  })
+
   it('checks Antigravity login with models instead of starting an interactive prompt', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'agentflow-auth-probe-'))
     temporaryDirectories.push(directory)
@@ -155,11 +178,32 @@ describe('subscription connectors', () => {
     expect(sanitizedSubscriptionEnvironment('subscription:kimi-code', 'C:\\profiles\\kimi', source)).toMatchObject({ KIMI_CODE_HOME: 'C:\\profiles\\kimi' })
   })
 
+  it('preserves the Windows PowerShell fallback when Claude has no Git Bash', () => {
+    const source = {
+      PATH: 'C:\\Windows\\System32',
+      SystemRoot: 'C:\\Windows',
+      ComSpec: 'C:\\Windows\\System32\\cmd.exe',
+      CLAUDE_CODE_GIT_BASH_PATH: 'C:\\missing\\Git\\bin\\bash.exe'
+    }
+    const environment = sanitizedSubscriptionEnvironment('subscription:claude-code', 'C:\\profiles\\claude', source, 'win32')
+    expect(environment).toMatchObject({
+      PATH: 'C:\\Windows\\System32',
+      SystemRoot: 'C:\\Windows',
+      ComSpec: 'C:\\Windows\\System32\\cmd.exe'
+    })
+    expect(environment.CLAUDE_CODE_GIT_BASH_PATH).toBeUndefined()
+    expect(environment.CLAUDE_CODE_USE_POWERSHELL_TOOL).toBeUndefined()
+    expect(sanitizedSubscriptionEnvironment('subscription:claude-code', 'C:\\profiles\\claude', {
+      ...source,
+      CLAUDE_CODE_USE_POWERSHELL_TOOL: '1'
+    }, 'win32')).toMatchObject({ CLAUDE_CODE_USE_POWERSHELL_TOOL: '1' })
+  })
+
   it('uses output-only policies and resumable structured output commands', () => {
     expect(subscriptionRuntimeTemplates('subscription:codex').args).toContain('read-only')
     expect(subscriptionRuntimeTemplates('subscription:claude-code').args).toEqual(expect.arrayContaining(['--bare', 'dontAsk', 'stream-json']))
-    expect(subscriptionRuntimeTemplates('subscription:kimi-code').resumeArgs).toEqual(expect.arrayContaining(['-r', '{session}', 'stream-json']))
-    expect(subscriptionRuntimeTemplates('subscription:antigravity').args).toEqual(expect.arrayContaining(['--sandbox', 'stream-json']))
+    expect(subscriptionRuntimeTemplates('subscription:kimi-code')).toEqual({ args: ['acp'], resumeArgs: ['acp'] })
+    expect(subscriptionRuntimeTemplates('subscription:antigravity').args).toEqual(expect.arrayContaining(['--input-format', 'stream-json', '--sandbox']))
     expect(subscriptionRuntimeTemplates('subscription:antigravity').resumeArgs).toEqual(expect.arrayContaining(['--conversation', '{session}']))
   })
 
