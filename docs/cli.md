@@ -12,7 +12,13 @@ The CLI validates AgentFlow graphs and coordinates their execution from the comm
 
 ## Build and install
 
-Use Node.js **22.13+**. From the repository root:
+For a Skill installation request, follow [installation and runtime setup](../skills/agentflow/references/installation.md). It checks for an existing desktop CLI before selecting the lightweight package and a host-provided or private Node runtime.
+
+The desktop package contains a command at `<install>/resources/agentflow/agentflow.cmd` on Windows or `AgentFlow.app/Contents/Resources/agentflow/agentflow` on macOS. Invoke it with `skill install --host codex --user` (or `--host claude`, or `--project "<directory>"`). This command installs the Skill only when invoked. Its launcher uses the application's built-in runtime with the GUI closed. No global PATH changes are needed.
+
+The complete lightweight Skill archive can install itself with `<node> "<extracted skill>/scripts/agentflow.mjs" skill install --host codex --user`. It records the selected Node executable in the installed launcher. Older releases can be copied as a complete Skill folder; see the installation procedure above.
+
+For source development, use Node.js **22.13+**. From the repository root:
 
 ```sh
 npm ci
@@ -34,7 +40,7 @@ On Windows, use a quoted path such as `"D:/Projects/My Project"`. Running the in
 | --- | --- |
 | `--host codex` | Install to `.agents/skills/agentflow` under the target directory. |
 | `--host claude` | Install to `.claude/skills/agentflow` under the target directory. |
-| `--host both` | Install for both hosts; this is the default. |
+| `--host both` | Install for both hosts; the source convenience script defaults to this. |
 | `--project <directory>` | Install for one project. |
 | `--user` | Install under the user's home directory; use this in place of `--project`. |
 

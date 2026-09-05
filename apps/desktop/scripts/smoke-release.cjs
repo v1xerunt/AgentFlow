@@ -22,6 +22,7 @@ child.once('close', code => {
     const report = JSON.parse(readFileSync(join(root, 'report.json'), 'utf8'))
     console.log(JSON.stringify(report, null, 2))
     if (code !== 0 || !report.ok || !report.packaged || report.platform !== process.platform || report.arch !== process.arch) process.exitCode = 1
+    else console.log(JSON.stringify({ cli: require('./smoke-desktop-cli.cjs')(executable, root) }, null, 2))
   } catch (error) { console.error(error); process.exitCode = 1 }
   finally {
     if (dirname(resolve(root)) === resolve(tmpdir()) && basename(root).startsWith('agentflow-release-smoke-')) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })

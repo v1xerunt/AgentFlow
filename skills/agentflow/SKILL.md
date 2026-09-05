@@ -19,14 +19,19 @@ Read [references/flow-spec.md](references/flow-spec.md) when creating or changin
 
 ## Execute with the host
 
-Resolve `scripts/agentflow.mjs` relative to this skill's directory and use its **absolute path**. Run commands with the user's workspace as the working directory. The helper requires Node.js 22.13+; the distributed skill includes its runtime. In the AgentFlow source checkout, build the CLI once with `npm run build --workspace @agentflow/cli` if the runtime is missing.
+Resolve the command from this skill's directory and use its **absolute path**, with the user's workspace as the working directory:
+
+- If `scripts/agentflow.cmd` (Windows) or `scripts/agentflow` (macOS/Linux) exists, use that launcher. It records the runtime selected at installation: the desktop application's built-in runtime or an available Node executable. Desktop CLI calls work with the window closed. In PowerShell, invoke it as `& "<absolute launcher>"`; in a POSIX shell, use `"<absolute launcher>"`.
+- Otherwise use `node "<absolute skill directory>/scripts/agentflow.mjs"` with Node.js 22.13+. In a source checkout, build the CLI once with `npm run build --workspace @agentflow/cli` if its compiled program is missing.
+
+In the examples below, replace `<agentflow>` with the complete command selected above. If the compiled program is missing after copying this folder from GitHub, or its recorded runtime has moved, follow [installation and runtime setup](references/installation.md). Validate the installed example before running the user's workflow.
 
 In the commands below, `<cli>` is that script, and `<run>` and `<task>` are the exact values returned by the CLI:
 
 ```sh
-node "<cli>" host validate "flow.json"
-node "<cli>" host start "flow.json" --workspace "."
-node "<cli>" host next "<run>"
+<agentflow> host validate "flow.json"
+<agentflow> host start "flow.json" --workspace "."
+<agentflow> host next "<run>"
 ```
 
 `start` snapshots the graph and returns `runDirectory`. `next` claims one dependency-ready Agent and returns its `task.id`, `messages`, `workspace`, `upstream` artifact references, and suggested `resultPath`.
@@ -39,8 +44,8 @@ For each claimed task:
 4. Submit and claim the next ready node:
 
 ```sh
-node "<cli>" host submit "<run>" "<task>" --file "<resultPath>"
-node "<cli>" host next "<run>"
+<agentflow> host submit "<run>" "<task>" --file "<resultPath>"
+<agentflow> host next "<run>"
 ```
 
 Continue until `status` is `completed`. `task: null` with running or failed nodes means the run still needs attention. Report the final deliverable and link the graph and useful artifacts. Describe execution accurately: the CLI coordinates; the host performs the model work.
@@ -52,8 +57,8 @@ The Flow does not grant new permissions. Apply the user's existing authorization
 Use the panel when the user wants to see or edit the Flow, or when the structure would benefit from a visual check:
 
 ```sh
-node "<cli>" host panel "flow.json" --out "flow-panel.html"
-node "<cli>" host panel "<run>" --out "run-panel.html"
+<agentflow> host panel "flow.json" --out "flow-panel.html"
+<agentflow> host panel "<run>" --out "run-panel.html"
 ```
 
 Choose a new output filename for each panel. Open it with the host's available file/browser preview, or return a clickable file link. The offline editor supports the Flow name/goal, node names, text inputs, unlocked prompts, and single-source Agent relation labels. Export downloads `flow.json`. Validate the exported graph before starting a new run. A run panel is a read-only snapshot; regenerate it for updated progress.

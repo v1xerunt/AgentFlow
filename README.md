@@ -38,7 +38,7 @@ Every Agent has its own model, instructions and conversation. You can inspect th
 
 ## Get started
 
-Open [GitHub Releases](https://github.com/v1xerunt/AgentFlow/releases) and download the installer for your computer. The desktop app includes its runtime; Node.js is only needed for source development and the standalone CLI / skill.
+Open [GitHub Releases](https://github.com/v1xerunt/AgentFlow/releases) and download the installer for your computer. The desktop package includes the GUI, CLI, Skill files and their runtime. Install the Skill into Codex or Claude Code when you need it; CLI calls work with the desktop window closed.
 
 | Your computer | Download | Install |
 | --- | --- | --- |
@@ -82,14 +82,16 @@ The [AgentFlow skill](skills/agentflow/SKILL.md) brings Flow creation and execut
 - **Inspect and resume execution.** The JSON CLI validates the Flow, hands off ready tasks, and saves completed outputs with their source dependencies. Interrupted work can continue from its saved state.
 - **Edit through conversation or a panel.** Ask the agent to change the Flow, or edit goals, inputs, prompts, and relation labels in an offline HTML panel. Export the graph to start a new run.
 
-Build and install the skill from the repository after `npm ci`:
+Ask your coding agent: **“Install the Skill from https://github.com/v1xerunt/AgentFlow.”** Follow the [installation procedure](skills/agentflow/references/installation.md): reuse an installed desktop CLI, or install the lightweight released Skill with a compatible Node runtime. Lightweight mode supports Flow creation, execution, saved results and offline HTML panels. Download the desktop app for the full interactive editor.
+
+To build from source after `npm ci`:
 
 ```sh
 npm run skill:build
 node scripts/install-skill.mjs --host both --project "/path/to/your/project"
 ```
 
-Use `--host codex` or `--host claude` for one host, or `--user` instead of `--project` for a personal installation. Existing installations are preserved. The folder at `dist/skills/agentflow` includes the runtime and needs only Node.js 22.13+ when copied to another machine. See [installation details](docs/cli.md#build-and-install).
+Use `--host codex` or `--host claude` for one host, or `--user` instead of `--project` for a personal installation. Existing installations are preserved. `dist/skills/agentflow` contains the compiled CLI and licenses; standalone use needs Node.js 22.13+. Desktop-installed Skills reuse the application's runtime. See [CLI setup](docs/cli.md#build-and-install).
 
 In your project, invoke `$agentflow` in Codex or `/agentflow` in Claude Code, followed by your task. The skill guides the CLI calls, and the host performs the reasoning and tool use. For direct CLI use, start with the [walkthrough](docs/cli.md#run-a-flow-with-the-host-agent).
 
@@ -101,12 +103,9 @@ You can ask your coding agent:
 
 When the user requests installation:
 
-1. Identify the host (Codex or Claude Code) and the user's target project. Keep that target separate from the AgentFlow source checkout. Use a personal installation when the user requests one.
-2. Read [the CLI installation guide](docs/cli.md#build-and-install) and [the installer](scripts/install-skill.mjs). The skill source in `skills/agentflow` and CLI source in `apps/cli` are a matching pair in this repository.
-3. If a checkout is needed, clone `https://github.com/v1xerunt/AgentFlow.git` with `--branch main` into a separate folder. In that checkout, verify Node.js 22.13+, run `npm ci`, then `npm run skill:build`.
-4. Install the complete bundle with `node scripts/install-skill.mjs --host codex --project "<absolute target project>"`. Use `--host claude` for Claude Code, `--host both` when both are requested, or replace `--project …` with `--user` for a personal installation. Existing installations require an explicit update decision from the user.
-5. Resolve the installed skill directory from the installer's output. Run `node "<installed skill>/scripts/agentflow.mjs" host validate "<installed skill>/assets/review-flow.json"` and confirm `valid: true`.
-6. Report the installation directory and invocation: `$agentflow` in Codex or `/agentflow` in Claude Code. If the skill is not listed, reopen the host session in the target project.
+1. Read [installation and runtime setup](skills/agentflow/references/installation.md) for desktop detection, complete lightweight packages, host-provided or private Node runtimes, existing installations and verification.
+2. Install for the current host and requested project; otherwise use its personal Skill location. Reuse a working desktop CLI when available. A Skill installation request covers its setup; the GUI remains an optional separate installation.
+3. Verify the installed command with `host validate "<installed skill>/assets/review-flow.json"`. Report success after `valid: true`, including the runtime, installation location and `$agentflow` / `/agentflow` invocation.
 
 Installation uses the host's documented [Codex skill directories](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) or [Claude Code skill directories](https://code.claude.com/docs/en/skills#where-skills-live).
 
