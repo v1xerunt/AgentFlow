@@ -74,7 +74,7 @@ try {
   assert.match(call(['host', 'status', runDir], true), /Invalid or edited/)
   const project = join(root, 'project')
   mkdirSync(project)
-  const install = spawnSync(process.execPath, [join(repository, 'scripts/install-skill.mjs'), '--host', 'both', '--project', project], { encoding: 'utf8', windowsHide: true, timeout: 20_000 })
+  const install = spawnSync(process.execPath, [join(repository, 'scripts/install-skill.mjs'), '--host', 'both', '--project', project, '--revision', 'a'.repeat(40)], { encoding: 'utf8', windowsHide: true, timeout: 20_000 })
   assert.equal(install.status, 0, install.stderr)
   for (const host of ['.agents', '.claude']) {
     const skill = join(project, host, 'skills/agentflow')
@@ -87,7 +87,7 @@ try {
     assert.equal(JSON.parse(launched.stdout).valid, true)
   }
   const portableProject = join(root, 'portable-project')
-  const portableInstall = call(['skill', 'install', '--host', 'codex', '--project', portableProject])
+  const portableInstall = call(['skill', 'install', '--host', 'codex', '--project', portableProject, '--revision', 'a'.repeat(40)])
   assert.equal(portableInstall.runtime, 'node')
   assert.ok(existsSync(join(portableProject, '.agents/skills/agentflow/SKILL.md')))
   const secondInstall = spawnSync(process.execPath, [join(repository, 'scripts/install-skill.mjs'), '--host', 'both', '--project', project], { encoding: 'utf8', windowsHide: true, timeout: 20_000 })

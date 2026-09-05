@@ -21,12 +21,14 @@ Read [references/flow-spec.md](references/flow-spec.md) when creating or changin
 
 Resolve the command from this skill's directory and use its **absolute path**, with the user's workspace as the working directory:
 
-- If `scripts/agentflow.cmd` (Windows) or `scripts/agentflow` (macOS/Linux) exists, use that launcher. It records the runtime selected at installation: the desktop application's built-in runtime or an available Node executable. Desktop CLI calls work with the window closed. In PowerShell, invoke it as `& "<absolute launcher>"`; in a POSIX shell, use `"<absolute launcher>"`.
-- Otherwise use `node "<absolute skill directory>/scripts/agentflow.mjs"` with Node.js 22.13+. In a source checkout, build the CLI once with `npm run build --workspace @agentflow/cli` if its compiled program is missing.
+- Use `scripts/agentflow.cmd` (Windows) or `scripts/agentflow` (macOS/Linux). The launcher records the Node executable selected during setup and runs this Skill's bundled CLI. In PowerShell, invoke it as `& "<absolute launcher>"`; in a POSIX shell, use `"<absolute launcher>"`.
+- If the launcher is missing or its runtime has moved, follow [installation and runtime setup](references/installation.md). Setup uses a host-provided or system Node.js 22.13+, or provisions a private Node runtime, then validates the example.
 
-In the examples below, replace `<agentflow>` with the complete command selected above. If the compiled program is missing after copying this folder from GitHub, or its recorded runtime has moved, follow [installation and runtime setup](references/installation.md). Validate the installed example before running the user's workflow.
+In the examples below, replace `<agentflow>` with the complete command selected above.
 
-In the commands below, `<cli>` is that script, and `<run>` and `<task>` are the exact values returned by the CLI:
+At the start of each new Skill task, choose one fresh task ID and run `<agentflow> skill check-update --task "<task-id>"` once. Reuse the same ID for any retry of that check. No output means continue with local work. If an update is reported, briefly relay the notice and update entry point; apply it only when the user requests an update. Node execution commands do not repeat the check. See [update behavior](references/installation.md#task-checks-and-explicit-updates) for the explicit update and status commands.
+
+In the commands below, `<run>` and `<task>` are the exact values returned by the CLI:
 
 ```sh
 <agentflow> host validate "flow.json"

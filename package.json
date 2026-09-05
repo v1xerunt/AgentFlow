@@ -1,6 +1,6 @@
 {
   "name": "agentflow-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -15,6 +15,8 @@
     "release": "npm run release --workspace @agentflow/desktop",
     "cli": "tsx apps/cli/src/index.ts",
     "skill:build": "npm run build --workspace @agentflow/cli && node scripts/package-skill.mjs",
+    "skill:sync": "npm run build --workspace @agentflow/cli && node scripts/sync-skill-runtime.mjs",
+    "test:skill-updates": "node --test scripts/skill-updates.test.mjs",
     "skill:install": "node scripts/install-skill.mjs",
     "test:host": "node scripts/smoke-host.cjs",
     "test:host-panel": "node scripts/smoke-host-panel.cjs",

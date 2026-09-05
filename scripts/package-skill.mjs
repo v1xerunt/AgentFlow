@@ -1,8 +1,11 @@
-import { cp, copyFile, lstat, mkdir, realpath, rm } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { lstat, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readBundle } from '../skills/agentflow/scripts/bundle-tools.mjs'
 
 const root = new URL('../', import.meta.url)
+execFileSync(process.execPath, [fileURLToPath(new URL('scripts/sync-skill-runtime.mjs', root)), '--check'], { stdio: 'inherit' })
 const output = new URL('dist/skills/agentflow/', root)
 // This fixed generated directory is the only deletion target; never merge old package contents.
 const previous = await lstat(output).catch(error => { if (error.code !== 'ENOENT') throw error })
@@ -14,8 +17,13 @@ if (previous) {
   await rm(output, { recursive: true })
 }
 await mkdir(output, { recursive: true })
-await cp(new URL('skills/agentflow/', root), output, { recursive: true })
-await copyFile(new URL('apps/cli/dist/index.js', root), new URL('scripts/agentflow-runtime.mjs', output))
-await cp(new URL('apps/cli/dist/licenses/', root), new URL('licenses/', output), { recursive: true })
-for (const name of ['LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md']) await copyFile(new URL(name, root), new URL(name, output))
+const { files } = await readBundle(fileURLToPath(new URL('skills/agentflow/', root)))
+for (const [name, bytes] of files) {
+  const target = join(fileURLToPath(output), name)
+  await mkdir(dirname(target), { recursive: true })
+  await writeFile(target, bytes)
+}
+const git = args => execFileSync('git', args, { cwd: fileURLToPath(root), encoding: 'utf8', windowsHide: true }).trim()
+const revision = git(['status', '--porcelain', '--', 'skills/agentflow']) ? null : git(['log', '-1', '--format=%H', '--', 'skills/agentflow'])
+await writeFile(new URL('.distribution.json', output), JSON.stringify({ revision }))
 console.log(`Standalone skill: ${fileURLToPath(output)}`)
