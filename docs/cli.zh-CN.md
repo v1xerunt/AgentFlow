@@ -12,11 +12,11 @@ CLI 用于在命令行中校验 AgentFlow 流程并协调执行。它的 JSON �
 
 ## 构建与安装
 
-用户要求安装 Skill 时，先按[安装与运行时配置](../skills/agentflow/references/installation.md)检查可用的桌面 CLI，再选择轻量包及宿主自带或独立的 Node 运行时。
+用户要求安装 Skill 时，按[安装与运行时配置](../skills/agentflow/references/installation.md)下载确定提交下的完整 `skills/agentflow` 目录，并将 SHA 传给安装脚本。脚本使用宿主或系统已有 Node，或者下载并校验独立的 Node 24 LTS 运行时。
 
-桌面包内置命令：Windows 为 `<安装目录>/resources/agentflow/agentflow.cmd`，macOS 为 `AgentFlow.app/Contents/Resources/agentflow/agentflow`。给命令传入 `skill install --host codex --user` 即可安装；Claude Code 使用 `--host claude`，项目安装使用 `--project "<目录>"`。只有执行安装命令才会写入 Skill 目录。安装后的命令入口使用应用内置运行时，GUI 关闭也能工作，无需修改系统 PATH。
+Windows 使用 `scripts/setup.ps1 -Revision "<sha>"`；macOS/Linux 使用 `sh scripts/setup.sh --revision "<sha>"`。宿主提供 Node 时传入 `-Node "<路径>"` 或 `--node "<路径>"`。安装后的入口记录运行时绝对路径，执行 Skill 自带的配套 CLI，保持系统 PATH 不变。
 
-完整轻量 Skill 包可用 `<node> "<解压后的 skill>/scripts/agentflow.mjs" skill install --host codex --user` 安装，并将选定的 Node 路径记录到命令入口。较早发布的包可直接复制完整 Skill 目录，详见上方安装流程。
+完整 Skill 可用 `<node> "<skill>/scripts/agentflow.mjs" skill install --host codex --user --revision "<sha>"` 安装。每个任务执行一次 `skill check-update --task "<任务 ID>"`；`skill status` 查看目录 SHA 和 CLI 构建标识；用户要求更新时执行 `skill update --revision "<sha>"`，一起替换 Skill 和配套 CLI，并保留配置。
 
 从源码开发需要 Node.js **22.13+**。在仓库根目录运行：
 
@@ -44,9 +44,9 @@ Windows 可使用带引号的路径，例如 `"D:/Projects/My Project"`。通过
 | `--project <directory>` | 安装到指定项目。 |
 | `--user` | 安装到用户主目录，与 `--project` 二选一。 |
 
-目标 skill 已存在时，安装器会停止。更新前保留本地修改，并将原安装移到其他位置，再安装新版。安装位置遵循宿主的 skill 发现规则：[Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)、[Claude Code](https://code.claude.com/docs/en/skills)。
+目标 skill 已存在时，安装器会停止。使用该 Skill 的 `skill update` 命令更新指令和配套 CLI，并保留配置。安装位置遵循宿主的 skill 发现规则：[Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)、[Claude Code](https://code.claude.com/docs/en/skills)。
 
-`dist/skills/agentflow` 是完整分发目录，包含运行时和许可文件。将它复制到 skill 目录后，只需要 Node.js 即可使用，无须项目源码或安装依赖。在已为 Codex 安装的项目中：
+`skills/agentflow` 是提交到仓库的完整分发目录，包含配套 CLI 和许可文件。修改 CLI 或 Skill 后运行 `npm run skill:sync`，同步 CLI 构建和 `bundle.json`；`npm run skill:build` 验证它们一致后生成 `dist/skills/agentflow`。安装脚本配置好 Node 后即可使用。在已为 Codex 安装的项目中：
 
 ```sh
 node .agents/skills/agentflow/scripts/agentflow.mjs host --help

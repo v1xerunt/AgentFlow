@@ -1,40 +1,42 @@
-# Install AgentFlow for a coding agent
+# Install and update the independent Skill
 
-Use this procedure when a user asks to install this repository as a Skill, or when a copied Skill is missing its compiled CLI. A successful installation includes a working command and a validated example Flow.
+AgentFlow's Skill directory contains its instructions, compiled CLI, examples, setup scripts and licenses. The host session supplies the model and tools. A Node runtime executes the bundled CLI. The Skill's version is the commit that last changed `skills/agentflow` on `main`; `bundle.json` identifies and checksums the matching CLI and every distributed file.
 
-## Select the host and destination
+## Install from the repository URL
 
-Install for the current host. Use a project installation when the user names a project; otherwise use that host's personal Skill directory. Codex discovers `.agents/skills/agentflow` under a project or the user's home; its built-in installer may select `$CODEX_HOME/skills/agentflow`. Claude Code uses `.claude/skills/agentflow` under a project or its configuration directory. Preserve the destination selected by the host's installer. Check for existing personal and project installations before creating another copy; preserve local edits and resolve an update with the user.
+1. Install for the current host. Use a project installation when the user names a project; otherwise use the host's personal Skill directory. Codex discovers `.agents/skills/agentflow` under a project or the user's home, and its built-in installer may select `$CODEX_HOME/skills/agentflow`. Claude Code uses `.claude/skills/agentflow` under a project or its configuration directory. Preserve the host installer's chosen destination. Inspect existing installations and retain local edits before replacing one.
+2. Query `https://api.github.com/repos/v1xerunt/AgentFlow/commits?sha=main&path=skills%2Fagentflow&per_page=1`, read the first commit's `sha`, and download the complete `skills/agentflow` directory at that SHA. For Codex's built-in GitHub Skill installer, use repository `v1xerunt/AgentFlow`, path `skills/agentflow`, and `--ref <sha>`. Keep the CLI, `bundle.json`, references, examples and licenses together. A complete published Skill archive is also usable; retain its `.distribution.json` provenance file.
+3. Discover a compatible Node.js **22.13+** executable. In Codex desktop, use its workspace-dependency tool when available to obtain its bundled Node path. The setup scripts also detect system Node. Run the appropriate setup command below, passing the downloaded commit SHA. If neither a host-provided nor system Node is available, the setup script downloads official Node 24 LTS into a dedicated user cache, checks its SHA-256, and keeps the distribution's license files. This dependency is part of the requested Skill setup; follow the host's permission requirements for downloads and writes.
+4. The setup script validates the example and writes a launcher with the selected Node's absolute path. Report success only after `valid: true`. Tell the user the Skill location, runtime and invocation (`$agentflow` in Codex, `/agentflow` in Claude Code). Refresh or reopen the host session if it has not discovered the Skill.
 
-## Reuse an installed desktop application
+Windows PowerShell (omit `-Node` to detect or provision Node):
 
-Use local filesystem tools to check conventional locations and any user-specified application path. Availability in a cloud container only describes that container; it does not establish what is installed on the user's computer.
-
-| Platform | Where to look for the bundled command |
-| --- | --- |
-| Windows | `<AgentFlow install directory>/resources/agentflow/agentflow.cmd`. Check `%LOCALAPPDATA%/Programs/AgentFlow`, `%LOCALAPPDATA%/Programs/agentflow`, then the `AgentFlow` uninstall registry entry for a custom location. |
-| macOS | `/Applications/AgentFlow.app/Contents/Resources/agentflow/agentflow`, or the equivalent under `~/Applications`. |
-| Linux package | `/opt/AgentFlow/resources/agentflow/agentflow` or `/opt/agentflow/resources/agentflow/agentflow`. Check the installed package file list for a custom location. |
-
-Validate a candidate by running its `--version` and `skill install --help`. Older desktop releases may lack this command; continue with the lightweight package in that case. Avoid launching the GUI just to detect installation.
-
-Run the discovered command with `skill install --host codex --user`, or replace `--user` with `--project "<absolute directory>"`. Use `claude` for Claude Code. The installer copies the complete Skill and writes a launcher that calls the installed application in Node mode. It works when the GUI is closed and needs no separate Node installation. For a destination already created by the host's Skill installer, install into a temporary project first, then transfer the complete bundle to that approved destination, preserving any user changes.
-
-An AppImage can be called in Node mode directly, without a permanent extraction or a running GUI. Replace the first path and append the desired CLI arguments:
-
-```sh
-ELECTRON_RUN_AS_NODE=1 "/absolute/AgentFlow.AppImage" --eval 'const p=require("node:path");const f=p.join(p.dirname(process.execPath),"resources/agentflow/cli/index.js");process.argv.splice(1,0,f);import(require("node:url").pathToFileURL(f).href)' -- skill install --host codex --user
+```powershell
+& "<installed skill>/scripts/setup.ps1" -Node "<host Node executable>" -Revision "<sha>"
 ```
 
-## Install the lightweight package
+If local PowerShell policy blocks this downloaded script, the host may use a process-scoped execution-policy override for the reviewed script, subject to its permissions; persistent policy settings remain unchanged.
 
-1. Get the latest published, non-prerelease release from `https://api.github.com/repos/v1xerunt/AgentFlow/releases/latest`. Download its `AgentFlow-<version>-skill.tar.gz` and `SHA256SUMS.txt` from the official release assets. Verify the archive's SHA-256 against that exact filename before extracting into a temporary directory. Preserve the complete Skill folder, including `scripts/agentflow-runtime.mjs`, references, examples and licenses. This supports graph creation, validation, host execution, recovery and offline HTML panels.
-2. Resolve an available Node.js **22.13+** executable: inspect `node` on PATH and runtimes explicitly exposed by the host, then confirm the selected executable's version. For Codex desktop, use its workspace-dependency tool when available to discover the bundled Node path. Do not hardcode a Codex cache version or assume a native coding-agent executable includes Node.
-3. If no compatible runtime is available, explain that this dependency is needed for the requested Skill and provision a current maintained Node LTS binary from `https://nodejs.org/` in a dedicated user directory, such as `~/.local/share/agentflow/node/<version>-<platform>-<arch>` or `%LOCALAPPDATA%/AgentFlow/runtimes/node/<version>-<arch>`. Select the actual operating system and CPU architecture, verify the official checksum, and retain the runtime's license files. Use its absolute executable path; keep system PATH and existing Node installations intact. Follow the host's permission requirements for downloads and local writes.
-4. With the selected Node executable, run `<node> "<extracted skill>/scripts/agentflow.mjs" skill install --host codex --user` (or the requested host/project). This records the executable in the Skill's launcher. For an older published bundle without `skill install`, copy its complete folder to the approved Skill destination and record the selected absolute Node invocation in its setup instructions.
+macOS/Linux (omit `--node` to detect or provision Node):
 
-For an explicitly requested source version, build that checkout with `npm ci` and `npm run skill:build`, then install `dist/skills/agentflow`. Copying `skills/agentflow` from GitHub alone provides the authoring source; it does not include the compiled CLI. Keep source instructions and compiled code from the same release or build.
+```sh
+sh "<installed skill>/scripts/setup.sh" --node "<host Node executable>" --revision "<sha>"
+```
 
-## Verify and report
+Private Node distributions live under `%LOCALAPPDATA%/AgentFlow/runtimes/node` on Windows, or `${XDG_DATA_HOME:-$HOME/.local/share}/agentflow/runtimes/node` on macOS/Linux. Setup keeps system PATH and existing Node installations intact. If a previously selected runtime moves, rerun setup with an available runtime; existing user configuration is retained.
 
-Use the installed command to run `host validate "<installed skill>/assets/review-flow.json"` and confirm `valid: true`. Report the Skill location, selected runtime and invocation (`$agentflow` in Codex, `/agentflow` in Claude Code). If the host has not discovered it, refresh or reopen the session. Offer the [desktop download](https://github.com/v1xerunt/AgentFlow/releases) for the full interactive editor. Installing the desktop GUI is a separate user choice.
+To copy an already downloaded bundle into a host directory, run `<node> "<bundle>/scripts/agentflow.mjs" skill install --host codex --user --revision "<sha>"`. Use `claude` or the requested `--project "<absolute directory>"`. The installer preserves existing destinations.
+
+## Task checks and explicit updates
+
+At the start of each new Skill task, select one fresh task ID and run the installed command with `skill check-update --task "<task-id>"`. Reuse that ID if the check itself must be retried. The script queries only the latest commit affecting `skills/agentflow` on `main`, once per task ID. An unchanged SHA, timeout, rate limit or offline connection produces no output and does not interrupt local work. A changed SHA produces one short update message with a pinned update command. Ordinary Flow commands do not check the network.
+
+When the user requests the update, run `skill update --revision "<sha from the prompt>"`. Omitting `--revision` selects the current directory revision on `main`. The updater verifies Git blob hashes, the complete bundle manifest and a real example CLI invocation in a staging directory. It then replaces the instructions and CLI together. A failed download or validation leaves the installed version usable.
+
+`.agentflow/config.json` stores the selected Node and user configuration. `.agentflow/installation.json` stores the installed directory SHA and CLI build hash. Configuration, task check records, launchers and additional user files survive updates. Local edits to versioned bundle files are detected before replacement; preserve or move those edits before updating. Use `skill status` to inspect the installed SHA and CLI build.
+
+## Source maintenance
+
+Run `npm run skill:sync` after changing the CLI or Skill resources, then include the compiled CLI, licenses and updated `bundle.json` in the same change. `npm run skill:build` verifies the committed bundle against the current CLI build and creates a distributable copy. This makes CLI changes visible to the directory-based update check. Desktop and README-only changes leave the Skill version unchanged.
+
+The [desktop application](https://github.com/v1xerunt/AgentFlow/releases) provides the full interactive editor as a separate installation. Lightweight Skill users can create and execute Flows, save intermediate results, recover runs and export offline HTML panels using their current coding-agent session.

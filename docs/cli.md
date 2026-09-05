@@ -12,11 +12,11 @@ The CLI validates AgentFlow graphs and coordinates their execution from the comm
 
 ## Build and install
 
-For a Skill installation request, follow [installation and runtime setup](../skills/agentflow/references/installation.md). It checks for an existing desktop CLI before selecting the lightweight package and a host-provided or private Node runtime.
+For a Skill installation request, follow [installation and runtime setup](../skills/agentflow/references/installation.md). Download the complete `skills/agentflow` directory at a pinned commit, then run its setup script with that SHA. Setup uses a host-provided or system Node runtime, or downloads and verifies a private Node 24 LTS distribution.
 
-The desktop package contains a command at `<install>/resources/agentflow/agentflow.cmd` on Windows or `AgentFlow.app/Contents/Resources/agentflow/agentflow` on macOS. Invoke it with `skill install --host codex --user` (or `--host claude`, or `--project "<directory>"`). This command installs the Skill only when invoked. Its launcher uses the application's built-in runtime with the GUI closed. No global PATH changes are needed.
+Windows setup: `scripts/setup.ps1 -Revision "<sha>"`; macOS/Linux setup: `sh scripts/setup.sh --revision "<sha>"`. Supply `-Node "<path>"` or `--node "<path>"` when the host exposes its own Node. The installed launcher records an absolute runtime path and executes the Skill's matched CLI. System PATH remains unchanged.
 
-The complete lightweight Skill archive can install itself with `<node> "<extracted skill>/scripts/agentflow.mjs" skill install --host codex --user`. It records the selected Node executable in the installed launcher. Older releases can be copied as a complete Skill folder; see the installation procedure above.
+The complete Skill can install itself with `<node> "<skill>/scripts/agentflow.mjs" skill install --host codex --user --revision "<sha>"`. Run `skill check-update --task "<task-id>"` once per task, `skill status` to inspect its directory SHA and CLI build, and `skill update --revision "<sha>"` when the user requests an update. Updates preserve configuration and replace the Skill and CLI together.
 
 For source development, use Node.js **22.13+**. From the repository root:
 
@@ -44,9 +44,9 @@ On Windows, use a quoted path such as `"D:/Projects/My Project"`. Running the in
 | `--project <directory>` | Install for one project. |
 | `--user` | Install under the user's home directory; use this in place of `--project`. |
 
-The installer stops if a target skill already exists. Preserve any local edits and move the existing installation before installing a replacement. These locations follow the hosts' skill discovery conventions: [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills), [Claude Code](https://code.claude.com/docs/en/skills).
+The installer stops if a target skill already exists. Use its `skill update` command to update the instructions and paired CLI while preserving configuration. These locations follow the hosts' skill discovery conventions: [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills), [Claude Code](https://code.claude.com/docs/en/skills).
 
-`dist/skills/agentflow` is the complete distributable folder, including the runtime and license notices. Once copied to a skill directory, it needs Node.js but no repository checkout or dependency installation. From a project with the Codex installation:
+`skills/agentflow` is the complete versioned bundle; `dist/skills/agentflow` is its verified distributable copy with provenance. After changing CLI or Skill resources, run `npm run skill:sync` and include the updated CLI and manifest. From a project with the Codex installation:
 
 ```sh
 node .agents/skills/agentflow/scripts/agentflow.mjs host --help

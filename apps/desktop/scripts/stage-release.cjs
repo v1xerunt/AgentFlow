@@ -1,7 +1,6 @@
 const { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } = require('node:fs')
 const { dirname, join, resolve, relative, isAbsolute } = require('node:path')
 const { createRequire } = require('node:module')
-const { execFileSync } = require('node:child_process')
 
 const desktop = resolve(__dirname, '..')
 const stage = join(desktop, 'release', 'app')
@@ -13,17 +12,6 @@ const platform = `${process.platform}-${process.arch}`
 const prebuild = join(ptyRoot, 'prebuilds', platform)
 if (!existsSync(prebuild)) throw new Error(`Missing node-pty prebuild for ${platform}`)
 if (!existsSync(join(desktop, 'out', 'main', 'index.js'))) throw new Error('Run the desktop build before staging')
-execFileSync(process.execPath, [join(desktop, '../../scripts/package-skill.mjs')], { stdio: 'inherit' })
-const launchers = join(desktop, 'release', 'launchers')
-mkdirSync(launchers, { recursive: true })
-if (process.platform === 'win32') {
-  writeFileSync(join(launchers, 'agentflow.cmd'), '@echo off\r\nsetlocal DisableDelayedExpansion\r\nset "ELECTRON_RUN_AS_NODE=1"\r\n"%~dp0..\\..\\AgentFlow.exe" "%~dp0cli\\index.js" %*\r\nexit /b %errorlevel%\r\n')
-} else {
-  const executable = process.platform === 'darwin' ? '../../MacOS/AgentFlow' : '../../agentflow'
-  const file = join(launchers, 'agentflow')
-  writeFileSync(file, `#!/bin/sh\nexport ELECTRON_RUN_AS_NODE=1\nexec "\${0%/*}/${executable}" "\${0%/*}/cli/index.js" "$@"\n`)
-  chmodSync(file, 0o755)
-}
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
 for (const directory of ['main', 'preload', 'renderer']) cpSync(join(desktop, 'out', directory), join(stage, 'out', directory), { recursive: true })

@@ -14,11 +14,6 @@ module.exports = {
   directories: { app: 'release/app', output: 'release/installers' },
   files: ['out/**/*', 'package.json', 'LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md', 'licenses/**/*'],
   asar: true,
-  extraResources: [
-    { from: '../cli/dist', to: 'agentflow/cli', filter: ['**/*', '!*.d.ts'] },
-    { from: '../../dist/skills/agentflow', to: 'agentflow/skill' },
-    { from: 'release/launchers', to: 'agentflow' }
-  ],
   asarUnpack: ['node_modules/node-pty/**/*'],
   // node-pty 1.2 ships Node-API prebuilds. stage-release copies the host build;
   // the packaged PTY smoke test is required on every release runner.

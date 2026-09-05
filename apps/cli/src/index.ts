@@ -32,7 +32,7 @@ function printEvent(event: RuntimeEvent) {
 program
   .name('agentflow')
   .description('Run AgentFlow graphs from the command line')
-  .version('0.1.0')
+  .version('0.2.0')
 
 program
   .command('validate')

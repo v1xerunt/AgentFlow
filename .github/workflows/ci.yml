@@ -93,6 +93,7 @@ jobs:
         run: |
           node scripts/ci-run.cjs node scripts/package-skill.mjs
           node scripts/ci-run.cjs node scripts/smoke-host.cjs
+          node scripts/ci-run.cjs npm run test:skill-updates
       - name: Offline skill panel
         if: runner.os == 'Linux'
         run: node scripts/ci-run.cjs xvfb-run -a node scripts/smoke-host-panel.cjs
