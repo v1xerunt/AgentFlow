@@ -24,6 +24,7 @@ for (const [name, bytes] of files) {
   await writeFile(target, bytes)
 }
 const git = args => execFileSync('git', args, { cwd: fileURLToPath(root), encoding: 'utf8', windowsHide: true }).trim()
+if (git(['rev-parse', '--is-shallow-repository']) === 'true') throw new Error('Skill packaging requires Git history to identify its directory version. Fetch with --unshallow first.')
 const revision = git(['status', '--porcelain', '--', 'skills/agentflow']) ? null : git(['log', '-1', '--format=%H', '--', 'skills/agentflow'])
 await writeFile(new URL('.distribution.json', output), JSON.stringify({ revision }))
 console.log(`Standalone skill: ${fileURLToPath(output)}`)
