@@ -76,7 +76,20 @@ try {
   mkdirSync(project)
   const install = spawnSync(process.execPath, [join(repository, 'scripts/install-skill.mjs'), '--host', 'both', '--project', project], { encoding: 'utf8', windowsHide: true, timeout: 20_000 })
   assert.equal(install.status, 0, install.stderr)
-  for (const host of ['.agents', '.claude']) assert.ok(existsSync(join(project, host, 'skills/agentflow/scripts/agentflow-runtime.mjs')))
+  for (const host of ['.agents', '.claude']) {
+    const skill = join(project, host, 'skills/agentflow')
+    assert.ok(existsSync(join(skill, 'scripts/agentflow-runtime.mjs')))
+    const launcher = join(skill, 'scripts', process.platform === 'win32' ? 'agentflow.cmd' : 'agentflow')
+    const launched = require('cross-spawn').sync(launcher, ['host', 'validate', join(skill, 'assets/review-flow.json')], {
+      env: { ...env, PATH: '', Path: '' }, encoding: 'utf8', windowsHide: true, timeout: 20_000
+    })
+    assert.equal(launched.status, 0, launched.stderr)
+    assert.equal(JSON.parse(launched.stdout).valid, true)
+  }
+  const portableProject = join(root, 'portable-project')
+  const portableInstall = call(['skill', 'install', '--host', 'codex', '--project', portableProject])
+  assert.equal(portableInstall.runtime, 'node')
+  assert.ok(existsSync(join(portableProject, '.agents/skills/agentflow/SKILL.md')))
   const secondInstall = spawnSync(process.execPath, [join(repository, 'scripts/install-skill.mjs'), '--host', 'both', '--project', project], { encoding: 'utf8', windowsHide: true, timeout: 20_000 })
   assert.notEqual(secondInstall.status, 0)
   console.log('Standalone host skill: dependency ordering, recovery, retry, lineage, immutable results, panels, locks, corruption checks, and both install targets passed.')
