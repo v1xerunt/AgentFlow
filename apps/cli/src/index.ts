@@ -5,6 +5,7 @@ import { Command } from 'commander'
 import { executeGraph, type RuntimeEvent } from '@agentflow/core'
 import { formatValidationError, parseGraph } from '@agentflow/schema'
 import { registerHostCommands } from './host-commands'
+import { registerSkillCommands } from './skill-install'
 
 const program = new Command()
 
@@ -75,4 +76,5 @@ program
   })
 
 registerHostCommands(program)
+registerSkillCommands(program)
 await program.parseAsync(process.argv)

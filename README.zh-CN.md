@@ -38,7 +38,7 @@
 
 ## 快速开始
 
-打开 [GitHub Releases](https://github.com/v1xerunt/AgentFlow/releases)，按电脑类型下载安装包。桌面版自带运行时；源码开发及独立 CLI / Skill 才需要安装 Node.js。
+打开 [GitHub Releases](https://github.com/v1xerunt/AgentFlow/releases)，按电脑类型下载安装包。桌面包包含 GUI、CLI、Skill 文件及运行时。需要时再将 Skill 安装到 Codex 或 Claude Code；关闭桌面窗口后，CLI 仍可独立调用。
 
 | 你的电脑 | 应下载的文件 | 安装方式 |
 | --- | --- | --- |
@@ -82,14 +82,16 @@ npm run dev
 - **检查过程并恢复运行。** JSON CLI 校验流程、分配就绪任务，记录完成结果和来源依赖，中断后可以从保存的状态继续。
 - **通过对话或面板编辑。** 让 agent 调整流程，或在本地 HTML 面板中修改目标、输入、提示词和关系标签，导出后开始新运行。
 
-在仓库执行 `npm ci` 后，构建并安装 skill：
+直接对编程 agent 说：**“给我安装 https://github.com/v1xerunt/AgentFlow 这个 Skill。”** 它应按照[安装流程](skills/agentflow/references/installation.md)，优先复用已安装的桌面 CLI；否则安装轻量 Skill 发布包并配置兼容的 Node 运行时。轻量模式支持创建和执行 Flow、保存结果、导出离线 HTML 面板；需要完整交互编辑器时再下载桌面应用。
+
+从源码安装时，在仓库执行 `npm ci` 后运行：
 
 ```sh
 npm run skill:build
 node scripts/install-skill.mjs --host both --project "/path/to/your/project"
 ```
 
-只安装一个宿主时使用 `--host codex` 或 `--host claude`；个人安装用 `--user` 替换 `--project`。安装器会保留已有安装。生成的 `dist/skills/agentflow` 包含运行时，复制到其他机器后只需要 Node.js 22.13+。详见[安装说明](docs/cli.zh-CN.md#构建与安装)。
+只安装一个宿主时使用 `--host codex` 或 `--host claude`；个人安装用 `--user` 替换 `--project`。安装器会保留已有安装。`dist/skills/agentflow` 包含编译后的 CLI 和许可文件，独立使用需要 Node.js 22.13+；通过桌面 CLI 安装的 Skill 使用应用内置运行时。详见 [CLI 安装说明](docs/cli.zh-CN.md#构建与安装)。
 
 在项目中使用 Codex 的 `$agentflow` 或 Claude Code 的 `/agentflow`，后面接要执行的任务。Skill 引导 CLI 调用，宿主完成实际推理和工具操作。直接使用命令行时，可以从[执行示例](docs/cli.zh-CN.md#使用宿主-agent-运行-flow)开始。
 
@@ -101,12 +103,9 @@ node scripts/install-skill.mjs --host both --project "/path/to/your/project"
 
 用户请求安装时，按以下步骤操作：
 
-1. 确定当前宿主是 Codex 还是 Claude Code，以及用户的目标项目目录。区分目标项目与 AgentFlow 源码目录；用户要求个人安装时使用个人范围。
-2. 阅读 [CLI 安装说明](docs/cli.zh-CN.md#构建与安装)和[安装器](scripts/install-skill.mjs)。仓库中的 `skills/agentflow` 与 `apps/cli` 是配套的 skill 和 CLI 源码。
-3. 需要获取源码时，将 `https://github.com/v1xerunt/AgentFlow.git` 的 `main` 分支克隆到独立目录。在源码目录检查 Node.js 22.13+，依次运行 `npm ci`、`npm run skill:build`。
-4. 用 `node scripts/install-skill.mjs --host codex --project "<目标项目的绝对路径>"` 安装完整包。Claude Code 使用 `--host claude`；用户要求两者时使用 `--host both`；个人安装用 `--user` 替换 `--project …`。遇到已有安装时，由用户明确决定如何更新。
-5. 从安装器输出取得实际 skill 目录，运行 `node "<已安装的 skill>/scripts/agentflow.mjs" host validate "<已安装的 skill>/assets/review-flow.json"`，确认返回 `valid: true`。
-6. 告知安装目录和调用方式：Codex 使用 `$agentflow`，Claude Code 使用 `/agentflow`。如果宿主尚未列出 skill，在目标项目中重新打开会话。
+1. 阅读[安装与运行时配置](skills/agentflow/references/installation.md)，按其中流程检测桌面应用、获取完整轻量包、复用宿主 Node 或配置独立运行时，并处理已有安装。
+2. 为当前宿主和用户指定的项目安装；未指定项目时使用宿主的个人 Skill 目录。优先复用可工作的桌面 CLI。用户要求安装 Skill 时完成它的依赖配置，完整 GUI 由用户另行选择安装。
+3. 用安装后的命令运行 `host validate "<已安装的 skill>/assets/review-flow.json"`；返回 `valid: true` 后再报告成功，并说明运行时、安装目录，以及 `$agentflow` / `/agentflow` 调用方式。
 
 安装位置遵循 [Codex 的 skill 目录](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)和 [Claude Code 的 skill 目录](https://code.claude.com/docs/en/skills#where-skills-live)。
 

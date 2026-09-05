@@ -12,7 +12,13 @@ CLI 用于在命令行中校验 AgentFlow 流程并协调执行。它的 JSON �
 
 ## 构建与安装
 
-需要 Node.js **22.13+**。在仓库根目录运行：
+用户要求安装 Skill 时，先按[安装与运行时配置](../skills/agentflow/references/installation.md)检查可用的桌面 CLI，再选择轻量包及宿主自带或独立的 Node 运行时。
+
+桌面包内置命令：Windows 为 `<安装目录>/resources/agentflow/agentflow.cmd`，macOS 为 `AgentFlow.app/Contents/Resources/agentflow/agentflow`。给命令传入 `skill install --host codex --user` 即可安装；Claude Code 使用 `--host claude`，项目安装使用 `--project "<目录>"`。只有执行安装命令才会写入 Skill 目录。安装后的命令入口使用应用内置运行时，GUI 关闭也能工作，无需修改系统 PATH。
+
+完整轻量 Skill 包可用 `<node> "<解压后的 skill>/scripts/agentflow.mjs" skill install --host codex --user` 安装，并将选定的 Node 路径记录到命令入口。较早发布的包可直接复制完整 Skill 目录，详见上方安装流程。
+
+从源码开发需要 Node.js **22.13+**。在仓库根目录运行：
 
 ```sh
 npm ci
@@ -34,7 +40,7 @@ Windows 可使用带引号的路径，例如 `"D:/Projects/My Project"`。通过
 | --- | --- |
 | `--host codex` | 安装到目标目录下的 `.agents/skills/agentflow`。 |
 | `--host claude` | 安装到目标目录下的 `.claude/skills/agentflow`。 |
-| `--host both` | 为两个宿主安装，默认使用此项。 |
+| `--host both` | 为两个宿主安装；源码便捷脚本默认使用此项。 |
 | `--project <directory>` | 安装到指定项目。 |
 | `--user` | 安装到用户主目录，与 `--project` 二选一。 |
 
