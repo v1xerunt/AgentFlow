@@ -10,7 +10,9 @@ Use Node.js 22.13+ and npm. Run `npm ci`, then `npm run dev`.
 
 For code changes, run `npm run typecheck` and the tests relevant to the changed behavior. Run `npm test` and `npm run build` before submitting a runtime or dependency change. Changes to paths, process execution, native modules or packaging should pass the multi-platform release workflow. State which platforms you actually tested.
 
-Keep English and Chinese text aligned. Keep generated output, local projects, credentials and archived evidence out of commits. Update the lockfile when dependencies change; preserve third-party notices when importing code or assets.
+Keep English and Chinese text aligned. Keep temporary build output, local projects, credentials and archived evidence out of commits. Update the lockfile when dependencies change; preserve third-party notices when importing code or assets.
+
+The distributable `skills/agentflow` directory includes its compiled CLI and licenses in version control. Run `npm run skill:sync` after changing the CLI or any Skill resources, and commit the bundle and `bundle.json` together. `skill:build` checks that source, CLI and manifest agree. Its directory commit SHA is independent of desktop releases; configuration remains under the installed Skill's `.agentflow` directory.
 
 ### CI and UI checks
 
@@ -50,7 +52,9 @@ The project may pursue separate commercial licensing. Including a contribution i
 
 代码修改应通过 `npm run typecheck` 及相关行为测试；运行时或依赖修改还需通过 `npm test` 和 `npm run build`。路径、后台进程、原生模块和打包变更应通过多平台发布工作流，并注明实际测试过的平台。
 
-同步维护中英文文案。提交时排除生成文件、本地项目、凭据和归档证据；依赖变更同步更新锁文件，引入第三方代码或素材时保留许可声明。
+同步维护中英文文案。提交时排除临时构建产物、本地项目、凭据和归档证据；依赖变更同步更新锁文件，引入第三方代码或素材时保留许可声明。
+
+可分发的 `skills/agentflow` 目录将配套 CLI 编译文件和许可证纳入版本管理。修改 CLI 或 Skill 资源后，运行 `npm run skill:sync`，一起提交完整包与 `bundle.json`；`skill:build` 会检查源码、CLI 和清单的一致性。Skill 以目录提交 SHA 独立于桌面版本更新，安装配置保存在 Skill 内的 `.agentflow` 目录。
 
 ### CI 与界面检查
 

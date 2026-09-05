@@ -1,6 +1,6 @@
 {
   "name": "@agentflow/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -12,8 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@agentflow/core": "0.1.0",
-    "@agentflow/schema": "0.1.0",
+    "@agentflow/core": "0.2.0",
+    "@agentflow/schema": "0.2.0",
     "commander": "^14.0.0"
   },
   "devDependencies": {

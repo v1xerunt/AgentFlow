@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "cli": {
+    "file": "scripts/agentflow-runtime.mjs",
+    "sha256": "0c5a3fac3ee256ed481122e590109a47589297362b3c66a0027a9207e2cffee4"
+  },
+  "files": {
+    "agents/openai.yaml": "aa140c5c9d10dac5918de1eab77062ff8b84a58703cfe52f0cc77f539b132028",
+    "assets/review-flow.json": "46508426d4ec9de17530557ed1e09cda7e948ffe9d105123a9cdc4ef8e63afb9",
+    "LICENSE": "d8a6cc31abc16b6748c7a21f21611f5a1ec33f67d22ca23d7da1c19b95496bee",
+    "licenses/commander-14.0.3/LICENSE": "04512a63dce4d2d506ad612dc0bd7681ccf6e3655f7b6eaef7dfac8323d1ec0b",
+    "licenses/index.json": "4a348fb77ddb35327bc1cac4e5e2f13dd733f17ac093638aa65363667cf9333f",
+    "licenses/yaml-2.9.0/LICENSE": "5bba27375d93e9119f76c1015f7672cf9ad5f70952296e0842fb2243d6376869",
+    "licenses/zod-3.25.76/LICENSE": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8",
+    "NOTICE": "57a91730a49c5ddbe2c3d7c5d954bf2dc48e7a5661e770916d4428fe74b7d577",
+    "references/cli.md": "2f32ce267e131e7887faf54965b9725b480d5e4ad72c030083a3c0ed2e335e11",
+    "references/execution-modes.md": "b9d28f43376aa3e245aa2ea332bb32c856c26478e89c02b2d0c73c42096cfa96",
+    "references/flow-spec.md": "eafc5e8629399b5ceee938b1f15046129920809b1b603545e74743df89bdfdb2",
+    "references/installation.md": "8061c7810c302dc0d2707caec484d40fb3461adc3f485faf78d915734de55824",
+    "scripts/agentflow-runtime.mjs": "0c5a3fac3ee256ed481122e590109a47589297362b3c66a0027a9207e2cffee4",
+    "scripts/agentflow.mjs": "317dc7ff2cdc215661b8c1d97d3e3948417cc9eb0995ba4a57cb497108e1186c",
+    "scripts/bundle-tools.mjs": "cf9ccc389a4b4fd033f943214e8b0a8e2e669f7d0daa58dd92886d3c26b44bf7",
+    "scripts/setup.ps1": "f723cb2c833bca909d6341821f0855c02d9cb2181d7710b4750d3b6a5f26f8b0",
+    "scripts/setup.sh": "05d258e46a9777459a92e84dfe64569be3783a2184d7498df7fcefebfd0b570d",
+    "scripts/skill-setup.mjs": "0d006d6a50b5abadd55b63d200cd3f5261a8620d7e96d86f965fab01018e092c",
+    "scripts/skill-updates.mjs": "26d0b296094c1cada09816e4f4461b03f03f2db553ed8d8c40368099e02b3048",
+    "SKILL.md": "a1e4a974b7dda0f4862162ac948a68194bf33d82b8b82842ee7c0778abb9822c",
+    "THIRD_PARTY_NOTICES.md": "83d905459c6b0a3cc5826f903767600899e3ad1323be47adf9e5f8c9ec51e886"
+  }
+}

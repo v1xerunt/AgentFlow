@@ -58,6 +58,9 @@ coverage/
 *.provisionprofile
 
 # OS metadata and local editor state
+skills/agentflow/.agentflow/
+skills/agentflow/scripts/agentflow.cmd
+skills/agentflow/scripts/agentflow
 .DS_Store
 ._*
 Thumbs.db

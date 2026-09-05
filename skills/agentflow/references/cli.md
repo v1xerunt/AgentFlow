@@ -1,6 +1,6 @@
 # Host CLI
 
-Append the command to the launcher resolved in `SKILL.md`. Desktop-installed Skills use `scripts/agentflow.cmd` on Windows or `scripts/agentflow` on macOS/Linux; standalone Skills use `node "<absolute skill directory>/scripts/agentflow.mjs"`. Commands return JSON on stdout. Errors return JSON on stderr with exit code 1; command-line usage errors also exit nonzero. Quote paths, especially on Windows. Use real argument arrays when invoking through code.
+Append the command to the launcher resolved in `SKILL.md`: `scripts/agentflow.cmd` on Windows or `scripts/agentflow` on macOS/Linux. It invokes the Skill's own CLI with the Node selected at setup. Flow commands return JSON on stdout. Errors return JSON on stderr with exit code 1; command-line usage errors also exit nonzero. Quote paths, especially on Windows. Use real argument arrays when invoking through code.
 
 | Command | Effect |
 | --- | --- |
